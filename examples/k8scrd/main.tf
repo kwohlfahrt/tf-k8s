@@ -6,4 +6,13 @@ terraform {
   }
 }
 
-provider "tfcrd" {}
+provider "tfcrd" {
+  kubeconfig = file("./kubeconfig")
+}
+
+data tfcrd_certificate "cert" {
+}
+
+output "dns_names" {
+  value = data.tfcrd_certificate.cert.spec.dns_names
+}

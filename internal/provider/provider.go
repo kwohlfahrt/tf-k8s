@@ -9,6 +9,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 type CrdProvider struct {
@@ -16,7 +19,7 @@ type CrdProvider struct {
 }
 
 type CrdProviderModel struct {
-	Endpoint types.String `tfsdk:"endpoint"`
+	Kubeconfig types.String `tfsdk:"kubeconfig"`
 }
 
 func (p *CrdProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -27,9 +30,9 @@ func (p *CrdProvider) Metadata(ctx context.Context, req provider.MetadataRequest
 func (p *CrdProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"endpoint": schema.StringAttribute{
-				MarkdownDescription: "Example attribute",
-				Optional:            true,
+			"kubeconfig": schema.StringAttribute{
+				MarkdownDescription: "Kubernetes Configuration",
+				Required:            true,
 			},
 		},
 	}
@@ -37,18 +40,35 @@ func (p *CrdProvider) Schema(ctx context.Context, req provider.SchemaRequest, re
 
 func (p *CrdProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
 	var data CrdProviderModel
-
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	resp.DataSourceData = 1
-	resp.ResourceData = 1
+	cc, err := clientcmd.NewClientConfigFromBytes([]byte(data.Kubeconfig.ValueString()))
+	if err != nil {
+		resp.Diagnostics.AddError("Unable to load kubeconfig", err.Error())
+		return
+	}
+	cfg, err := cc.ClientConfig()
+	if err != nil {
+		resp.Diagnostics.AddError("Unable to get client configuration", err.Error())
+		return
+	}
+	k, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		resp.Diagnostics.AddError("Unable to construct kubernetes client", err.Error())
+		return
+	}
+
+	resp.DataSourceData = k
+	resp.ResourceData = k
 }
 
 func (p *CrdProvider) DataSources(context.Context) []func() datasource.DataSource {
-	return []func() datasource.DataSource{}
+	return []func() datasource.DataSource{
+		NewCertificateDataSource,
+	}
 }
 
 func (p *CrdProvider) Resources(context.Context) []func() resource.Resource {
