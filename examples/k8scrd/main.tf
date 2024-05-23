@@ -7,10 +7,14 @@ terraform {
 }
 
 provider "tfcrd" {
-  kubeconfig = file("./kubeconfig")
+  kubeconfig = file("./kubeconfig.yaml")
 }
 
-data tfcrd_certificate "cert" {
+data "tfcrd_certificate" "cert" {
+  metadata = {
+    name      = "cert"
+    namespace = "default"
+  }
 }
 
 output "dns_names" {

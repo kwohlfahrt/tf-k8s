@@ -10,7 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -55,7 +55,7 @@ func (p *CrdProvider) Configure(ctx context.Context, req provider.ConfigureReque
 		resp.Diagnostics.AddError("Unable to get client configuration", err.Error())
 		return
 	}
-	k, err := kubernetes.NewForConfig(cfg)
+	k, err := dynamic.NewForConfig(cfg)
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to construct kubernetes client", err.Error())
 		return
