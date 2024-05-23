@@ -10,8 +10,6 @@ import (
 	"k8s.io/client-go/dynamic"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	runtimeschema "k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 type certificateDataSource struct {
@@ -76,96 +74,25 @@ func (c *certificateDataSource) Schema(ctx context.Context, req datasource.Schem
 	}
 }
 
-var certificateResource = runtimeschema.GroupVersionResource{Group: "cert-manager.io", Version: "v1", Resource: "certificates"}
-
 func (c *certificateDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var data certificateDataSourceModel
+	var data certificateModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	obj, err := c.client.Resource(certificateResource).
+	obj, err := c.client.Resource(certificateGvr).
 		Namespace(data.Metadata.Namespace).
 		Get(ctx, data.Metadata.Name, metav1.GetOptions{})
-
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to fetch resource", err.Error())
 		return
 	}
 
-	dnsNames, found, err := unstructured.NestedStringSlice(obj.UnstructuredContent(), "spec", "dnsNames")
-	if err != nil || !found {
-		if err == nil {
-			err = fmt.Errorf("field spec.dnsNames not found")
-		}
-		resp.Diagnostics.AddError("Error extracting field", err.Error())
-		return
-	}
-
-	secretName, found, err := unstructured.NestedString(obj.UnstructuredContent(), "spec", "secretName")
-	if err != nil || !found {
-		if err == nil {
-			err = fmt.Errorf("field spec.secretName not found")
-		}
-		resp.Diagnostics.AddError("Error extracting field", err.Error())
-		return
-	}
-
-	issuerGroup, found, err := unstructured.NestedString(obj.UnstructuredContent(), "spec", "issuerRef", "group")
-	if err != nil || !found {
-		if err == nil {
-			err = fmt.Errorf("field spec.issuerRef.group not found")
-		}
-		resp.Diagnostics.AddError("Error extracting field", err.Error())
-		return
-	}
-
-	issuerKind, found, err := unstructured.NestedString(obj.UnstructuredContent(), "spec", "issuerRef", "kind")
-	if err != nil || !found {
-		if err == nil {
-			err = fmt.Errorf("field spec.issuerRef.kind not found")
-		}
-		resp.Diagnostics.AddError("Error extracting field", err.Error())
-		return
-	}
-
-	issuerName, found, err := unstructured.NestedString(obj.UnstructuredContent(), "spec", "issuerRef", "name")
-	if err != nil || !found {
-		if err == nil {
-			err = fmt.Errorf("field spec.issuerRef.name not found")
-		}
-		resp.Diagnostics.AddError("Error extracting field", err.Error())
-		return
-	}
-
-	name, found, err := unstructured.NestedString(obj.UnstructuredContent(), "metadata", "name")
+	state, err := loadCertificate(obj)
 	if err != nil {
-		resp.Diagnostics.AddError("Error extracting metadata.name", err.Error())
+		resp.Diagnostics.AddError("Unable to parse resource", err.Error())
 		return
-	}
-	if !found {
-		resp.Diagnostics.AddError("No field found for metadata.name", "")
-		return
-	}
-
-	namespace, found, err := unstructured.NestedString(obj.UnstructuredContent(), "metadata", "namespace")
-	if err != nil {
-		resp.Diagnostics.AddError("Error extracting metadata.namespace", err.Error())
-		return
-	}
-	if !found {
-		resp.Diagnostics.AddError("No field found for metadata.namespace", "")
-		return
-	}
-
-	state := certificateDataSourceModel{
-		Metadata: &certificateMetadata{Name: name, Namespace: namespace},
-		Spec: &certificateSpec{
-			DnsNames:   dnsNames,
-			IssuerRef:  issuerRef{Group: issuerGroup, Kind: issuerKind, Name: issuerName},
-			SecretName: secretName,
-		},
 	}
 
 	diags := resp.State.Set(ctx, &state)

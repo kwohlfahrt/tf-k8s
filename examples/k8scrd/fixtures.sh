@@ -5,7 +5,7 @@ kubectl apply -f - <<EOF
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: cert
+  name: foo
 spec:
   dnsNames:
   - foo.example.com

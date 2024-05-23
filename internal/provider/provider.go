@@ -72,7 +72,9 @@ func (p *CrdProvider) DataSources(context.Context) []func() datasource.DataSourc
 }
 
 func (p *CrdProvider) Resources(context.Context) []func() resource.Resource {
-	return []func() resource.Resource{}
+	return []func() resource.Resource{
+		NewCertificateResource,
+	}
 }
 
 func (p *CrdProvider) Functions(context.Context) []func() function.Function {
