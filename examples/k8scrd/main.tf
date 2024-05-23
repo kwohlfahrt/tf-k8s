@@ -17,6 +17,6 @@ data "tfcrd_certificate" "cert" {
   }
 }
 
-output "dns_names" {
-  value = data.tfcrd_certificate.cert.spec.dns_names
+output "cert_spec" {
+  value = data.tfcrd_certificate.cert.spec
 }

@@ -13,10 +13,5 @@ spec:
     group: cert-manager.io
     kind: ClusterIssuer
     name: production
-  privateKey:
-    algorithm: ECDSA
   secretName: foo
-  usages:
-  - digital signature
-  - key encipherment
 EOF
