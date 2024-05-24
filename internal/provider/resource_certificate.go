@@ -3,10 +3,9 @@ package provider
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/types"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
@@ -25,35 +24,29 @@ func (c *certificateResource) Metadata(ctx context.Context, req resource.Metadat
 }
 
 func (c *certificateResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = schema.Schema{
-		Attributes: map[string]schema.Attribute{
-			"metadata": schema.SingleNestedAttribute{
-				Required: true,
-				Attributes: map[string]schema.Attribute{
-					"name":      schema.StringAttribute{Required: true},
-					"namespace": schema.StringAttribute{Required: true},
-				},
-			},
-			"spec": schema.SingleNestedAttribute{
-				Required: true,
-				Attributes: map[string]schema.Attribute{
-					"dns_names": schema.ListAttribute{
-						ElementType: types.StringType,
-						Required:    true,
-					},
-					"issuer_ref": schema.SingleNestedAttribute{
-						Attributes: map[string]schema.Attribute{
-							"group": schema.StringAttribute{Required: true},
-							"kind":  schema.StringAttribute{Required: true},
-							"name":  schema.StringAttribute{Required: true},
-						},
-						Required: true,
-					},
-					"secret_name": schema.StringAttribute{Required: true},
-				},
-			},
-		},
+	schemaBytes, err := os.ReadFile("./cert-manager.crds.yaml")
+	if err != nil {
+		resp.Diagnostics.AddError("Unable to read schema file", err.Error())
+		return
 	}
+
+	crd, err := loadCrd(schemaBytes, "v1")
+	if err != nil {
+		resp.Diagnostics.AddError("Unable to parse schema file", err.Error())
+		return
+	}
+	if crd == nil {
+		resp.Diagnostics.AddError("CRD version not found", "v1")
+		return
+	}
+
+	result, err := openApiToTfSchema(crd)
+	if err != nil {
+		resp.Diagnostics.AddError("Could not convert CRD to schema", err.Error())
+		return
+	}
+
+	resp.Schema = *result
 }
 
 func (c *certificateResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
