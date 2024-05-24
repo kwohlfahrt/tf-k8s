@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 )
@@ -73,6 +74,8 @@ func (c *certificateResource) Configure(ctx context.Context, req resource.Config
 	c.client = client
 }
 
+const fieldManager string = "tofu-k8scrd"
+
 func (c *certificateResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var data certificateModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
@@ -82,9 +85,13 @@ func (c *certificateResource) Create(ctx context.Context, req resource.CreateReq
 
 	certificate := dumpCertificate(&data)
 
+	// TODO: Validate that we haven't previously created the object. It will
+	// conflict fail if it was created by a different tool, but if we created it
+	// and forgot, this will silently adopt the object.  We could generate a
+	// unique `FieldManager` ID per resource, and persist it in the TF state.
 	obj, err := c.client.Resource(certificateGvr).
 		Namespace(data.Metadata.Namespace).
-		Create(ctx, certificate, metav1.CreateOptions{})
+		Apply(ctx, data.Metadata.Name, certificate, metav1.ApplyOptions{FieldManager: fieldManager})
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to create resource", err.Error())
 	}
@@ -110,6 +117,10 @@ func (c *certificateResource) Read(ctx context.Context, req resource.ReadRequest
 		Namespace(data.Metadata.Namespace).
 		Get(ctx, data.Metadata.Name, metav1.GetOptions{})
 	if err != nil {
+		if errors.IsGone(err) || errors.IsNotFound(err) {
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError("Unable to fetch resource", err.Error())
 		return
 	}
@@ -124,8 +135,30 @@ func (c *certificateResource) Read(ctx context.Context, req resource.ReadRequest
 	resp.Diagnostics.Append(diags...)
 }
 
-func (c *certificateResource) Update(context.Context, resource.UpdateRequest, *resource.UpdateResponse) {
-	panic("unimplemented")
+func (c *certificateResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var data certificateModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	certificate := dumpCertificate(&data)
+	obj, err := c.client.Resource(certificateGvr).
+		Namespace(data.Metadata.Namespace).
+		Apply(ctx, data.Metadata.Name, certificate, metav1.ApplyOptions{FieldManager: fieldManager})
+	if err != nil {
+		resp.Diagnostics.AddError("Unable to patch resource", err.Error())
+		return
+	}
+
+	state, err := loadCertificate(obj)
+	if err != nil {
+		resp.Diagnostics.AddError("Unable to parse resource", err.Error())
+		return
+	}
+
+	diags := resp.State.Set(ctx, &state)
+	resp.Diagnostics.Append(diags...)
 }
 
 func (c *certificateResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {

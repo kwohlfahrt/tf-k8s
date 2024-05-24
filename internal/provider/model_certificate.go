@@ -55,59 +55,59 @@ func dumpCertificate(data *certificateModel) *unstructured.Unstructured {
 
 func loadCertificate(obj *unstructured.Unstructured) (*certificateModel, error) {
 	dnsNames, found, err := unstructured.NestedStringSlice(obj.UnstructuredContent(), "spec", "dnsNames")
-	if !found {
-		err = fmt.Errorf("field spec.dnsNames not found")
-	}
 	if err != nil {
 		return nil, err
+	}
+	if !found {
+		return nil, fmt.Errorf("field spec.dnsNames not found")
 	}
 
 	secretName, found, err := unstructured.NestedString(obj.UnstructuredContent(), "spec", "secretName")
-	if !found {
-		err = fmt.Errorf("field spec.secretName not found")
-	}
 	if err != nil {
 		return nil, err
+	}
+	if !found {
+		return nil, fmt.Errorf("field spec.secretName not found")
 	}
 
 	issuerGroup, found, err := unstructured.NestedString(obj.UnstructuredContent(), "spec", "issuerRef", "group")
-	if !found {
-		err = fmt.Errorf("field spec.issuerRef.group not found")
-	}
 	if err != nil {
 		return nil, err
+	}
+	if !found {
+		return nil, fmt.Errorf("field spec.issuerRef.group not found")
 	}
 
 	issuerKind, found, err := unstructured.NestedString(obj.UnstructuredContent(), "spec", "issuerRef", "kind")
-	if !found {
-		err = fmt.Errorf("field spec.issuerRef.kind not found")
-	}
 	if err != nil {
 		return nil, err
+	}
+	if !found {
+		return nil, fmt.Errorf("field spec.issuerRef.kind not found")
 	}
 
 	issuerName, found, err := unstructured.NestedString(obj.UnstructuredContent(), "spec", "issuerRef", "name")
-	if !found {
-		err = fmt.Errorf("field spec.issuerRef.name not found")
-	}
 	if err != nil {
 		return nil, err
+	}
+	if !found {
+		return nil, fmt.Errorf("field spec.issuerRef.name not found")
 	}
 
 	name, found, err := unstructured.NestedString(obj.UnstructuredContent(), "metadata", "name")
-	if !found {
-		err = fmt.Errorf("no field found for metadata.name", "")
-	}
 	if err != nil {
 		return nil, err
+	}
+	if !found {
+		return nil, fmt.Errorf("no field found for metadata.name")
 	}
 
 	namespace, found, err := unstructured.NestedString(obj.UnstructuredContent(), "metadata", "namespace")
-	if !found {
-		err = fmt.Errorf("No field found for metadata.namespace", "")
-	}
 	if err != nil {
 		return nil, err
+	}
+	if !found {
+		return nil, fmt.Errorf("no field found for metadata.namespace")
 	}
 
 	return &certificateModel{
