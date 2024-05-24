@@ -12,7 +12,7 @@ import (
 
 var (
 	version string = "dev"
-	name    string = "github.com/kwohlfahrt/tfcrd"
+	name    string = "github.com/kwohlfahrt/k8scrd"
 )
 
 func main() {

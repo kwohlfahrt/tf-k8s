@@ -1,23 +1,23 @@
 terraform {
   required_providers {
-    tfcrd = {
+    k8scrd = {
       source = "github.com/kwohlfahrt/k8scrd"
     }
   }
 }
 
-provider "tfcrd" {
+provider "k8scrd" {
   kubeconfig = file("./kubeconfig.yaml")
 }
 
-data "tfcrd_certificate" "foo" {
+data "k8scrd_certificate" "foo" {
   metadata = {
     name      = "foo"
     namespace = "default"
   }
 }
 
-resource "tfcrd_certificate" "bar" {
+resource "k8scrd_certificate" "bar" {
   metadata = {
     name      = "bar"
     namespace = "default"
@@ -34,5 +34,5 @@ resource "tfcrd_certificate" "bar" {
 }
 
 output "cert_spec" {
-  value = data.tfcrd_certificate.foo.spec
+  value = data.k8scrd_certificate.foo.spec
 }

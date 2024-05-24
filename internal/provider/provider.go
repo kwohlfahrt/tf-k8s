@@ -23,7 +23,7 @@ type CrdProviderModel struct {
 }
 
 func (p *CrdProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
-	resp.TypeName = "tfcrd"
+	resp.TypeName = "k8scrd"
 	resp.Version = p.version
 }
 
