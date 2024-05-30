@@ -101,7 +101,7 @@ func openApiToTfAttribute(path []string, openapi map[string]interface{}) (schema
 		if err != nil {
 			return nil, err
 		}
-		return &schema.SingleNestedAttribute{
+		return schema.SingleNestedAttribute{
 			Required:   true,
 			Attributes: attributes,
 		}, nil
@@ -118,24 +118,16 @@ func openApiToTfAttribute(path []string, openapi map[string]interface{}) (schema
 
 		switch attr := attribute.(type) {
 		case schema.SingleNestedAttribute:
-			return &schema.ListNestedAttribute{
-				Required: true,
-				NestedObject: schema.NestedAttributeObject{
-					Attributes:    attr.Attributes,
-					CustomType:    attr.CustomType,
-					Validators:    attr.Validators,
-					PlanModifiers: attr.PlanModifiers,
-				},
-			}, nil
+			return schema.ListNestedAttribute{Required: true, NestedObject: objectToNestedObject(attr)}, nil
 		default:
-			return &schema.ListAttribute{Required: true, ElementType: attr.GetType()}, nil
+			return schema.ListAttribute{Required: true, ElementType: attr.GetType()}, nil
 		}
 	case "string":
-		return &schema.StringAttribute{Required: true}, nil
+		return schema.StringAttribute{Required: true}, nil
 	case "integer":
-		return &schema.Int64Attribute{Required: true}, nil
+		return schema.Int64Attribute{Required: true}, nil
 	case "boolean":
-		return &schema.BoolAttribute{Required: true}, nil
+		return schema.BoolAttribute{Required: true}, nil
 	case "":
 		return nil, fmt.Errorf("schema item has no type at %s", strings.Join(path, ""))
 	default:

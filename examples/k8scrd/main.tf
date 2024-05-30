@@ -37,10 +37,11 @@ resource "k8scrd_certificate" "bar" {
     email_addresses           = []
     encode_usages_in_request  = false
     ip_addresses              = []
-    is_ca                     = false
+    # FIXME: Commented out  because of casing round-trip issues (isCA -> is_ca -> isCa)
+    # is_ca                     = false
     keystores = {
       jks    = { create = false, password_secret_ref = { key = "", name = "" } }
-      pkcs12 = { create = false, profile = "", password_secret_ref = { key = "", name = "" } }
+      pkcs12 = { create = false, profile = "Modern2023", password_secret_ref = { key = "", name = "" } }
     }
     literal_subject = ""
     name_constraints = {
@@ -50,10 +51,10 @@ resource "k8scrd_certificate" "bar" {
     }
     other_names = []
     private_key = {
-      algorithm       = ""
-      encoding        = ""
-      rotation_policy = ""
-      size            = 0
+      algorithm       = "ECDSA"
+      encoding        = "PKCS8"
+      rotation_policy = "Never"
+      size            = 256
     }
     renew_before           = ""
     revision_history_limit = 0
