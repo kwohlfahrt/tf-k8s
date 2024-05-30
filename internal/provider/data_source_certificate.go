@@ -3,12 +3,14 @@ package provider
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"k8s.io/client-go/dynamic"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -43,60 +45,67 @@ func (c *certificateDataSource) Metadata(ctx context.Context, req datasource.Met
 }
 
 func (c *certificateDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	schemaBytes, err := os.ReadFile("./cert-manager.crds.yaml")
+	if err != nil {
+		resp.Diagnostics.AddError("Unable to read schema file", err.Error())
+		return
+	}
+
+	crd, err := loadCrd(schemaBytes, "v1")
+	if err != nil {
+		resp.Diagnostics.AddError("Unable to parse schema file", err.Error())
+		return
+	}
+	if crd == nil {
+		resp.Diagnostics.AddError("CRD version not found", "v1")
+		return
+	}
+
+	result, err := openApiToTfSchema(crd, true)
+	if err != nil {
+		resp.Diagnostics.AddError("Could not convert CRD to schema", err.Error())
+		return
+	}
+
+	attributes := make(map[string]schema.Attribute, len(result.Attributes))
+	for name, attr := range result.Attributes {
+		// resource attributes and datasource attributes are the same interface
+		// (fwschema.Attribute), so just cast it. Not sure if there's a cleaner
+		// way to implement this.
+		attributes[name] = attr.(schema.Attribute)
+	}
+
 	resp.Schema = schema.Schema{
-		Attributes: map[string]schema.Attribute{
-			"metadata": schema.SingleNestedAttribute{
-				Required: true,
-				Attributes: map[string]schema.Attribute{
-					"name":      schema.StringAttribute{Required: true},
-					"namespace": schema.StringAttribute{Required: true},
-				},
-			},
-			"spec": schema.SingleNestedAttribute{
-				Computed: true,
-				Attributes: map[string]schema.Attribute{
-					"dns_names": schema.ListAttribute{
-						ElementType: types.StringType,
-						Computed:    true,
-					},
-					"issuer_ref": schema.SingleNestedAttribute{
-						Attributes: map[string]schema.Attribute{
-							"group": schema.StringAttribute{Computed: true},
-							"kind":  schema.StringAttribute{Computed: true},
-							"name":  schema.StringAttribute{Computed: true},
-						},
-						Computed: true,
-					},
-					"secret_name": schema.StringAttribute{Computed: true},
-				},
-			},
-		},
+		Attributes:          attributes,
+		Description:         result.Description,
+		MarkdownDescription: result.MarkdownDescription,
 	}
 }
 
 func (c *certificateDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var data certificateModel
-	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	var metadata objectMeta
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("metadata"), &metadata)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	obj, err := c.client.Resource(certificateGvr).
-		Namespace(data.Metadata.Namespace).
-		Get(ctx, data.Metadata.Name, metav1.GetOptions{})
+	obj, err := c.client.Resource(certificateGvr).Namespace(metadata.Namespace).
+		Get(ctx, metadata.Name, metav1.GetOptions{})
 	if err != nil {
+		if errors.IsGone(err) || errors.IsNotFound(err) {
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError("Unable to fetch resource", err.Error())
 		return
 	}
 
-	state, err := loadCertificate(obj)
-	if err != nil {
-		resp.Diagnostics.AddError("Unable to parse resource", err.Error())
+	state, diags := objectToState(ctx, resp.State, obj)
+	resp.Diagnostics.Append(diags...)
+	if diags.HasError() {
 		return
 	}
-
-	diags := resp.State.Set(ctx, &state)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
 
 var (

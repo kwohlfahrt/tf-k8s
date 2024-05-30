@@ -41,7 +41,7 @@ func (c *certificateResource) Schema(ctx context.Context, req resource.SchemaReq
 		return
 	}
 
-	result, err := openApiToTfSchema(crd)
+	result, err := openApiToTfSchema(crd, false)
 	if err != nil {
 		resp.Diagnostics.AddError("Could not convert CRD to schema", err.Error())
 		return
@@ -71,7 +71,7 @@ func (c *certificateResource) Configure(ctx context.Context, req resource.Config
 const fieldManager string = "tofu-k8scrd"
 
 func (c *certificateResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var metadata certificateMetadata
+	var metadata objectMeta
 	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("metadata"), &metadata)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -103,7 +103,7 @@ func (c *certificateResource) Create(ctx context.Context, req resource.CreateReq
 }
 
 func (c *certificateResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var metadata certificateMetadata
+	var metadata objectMeta
 	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("metadata"), &metadata)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -129,7 +129,7 @@ func (c *certificateResource) Read(ctx context.Context, req resource.ReadRequest
 }
 
 func (c *certificateResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var metadata certificateMetadata
+	var metadata objectMeta
 	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("metadata"), &metadata)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -159,7 +159,7 @@ func (c *certificateResource) Update(ctx context.Context, req resource.UpdateReq
 }
 
 func (c *certificateResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var metadata certificateMetadata
+	var metadata objectMeta
 	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("metadata"), &metadata)...)
 	if resp.Diagnostics.HasError() {
 		return

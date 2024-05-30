@@ -60,7 +60,7 @@ func loadCrd(bytes []byte, requiredVersion string) (map[string]interface{}, erro
 	return nil, nil
 }
 
-func openApiToTfSchema(openapi map[string]interface{}) (*schema.Schema, error) {
+func openApiToTfSchema(openapi map[string]interface{}, datasource bool) (*schema.Schema, error) {
 	if ty := openapi["type"]; ty != "object" {
 		return nil, fmt.Errorf("expected object, got type: %s", ty)
 	}
@@ -75,7 +75,7 @@ func openApiToTfSchema(openapi map[string]interface{}) (*schema.Schema, error) {
 		return nil, fmt.Errorf("object spec has invalid properties")
 	}
 
-	spec, err := propertiesToAttributes([]string{"spec"}, specProperties)
+	spec, err := propertiesToAttributes([]string{"spec"}, specProperties, datasource)
 	if err != nil {
 		return nil, err
 	}
@@ -89,20 +89,25 @@ func openApiToTfSchema(openapi map[string]interface{}) (*schema.Schema, error) {
 			"namespace": schema.StringAttribute{Required: true},
 		},
 	}
-	attributes["spec"] = schema.SingleNestedAttribute{Required: true, Attributes: spec}
+	attributes["spec"] = schema.SingleNestedAttribute{
+		Required:   !datasource,
+		Computed:   datasource,
+		Attributes: spec,
+	}
 
 	return &schema.Schema{Attributes: attributes}, nil
 }
 
-func openApiToTfAttribute(path []string, openapi map[string]interface{}) (schema.Attribute, error) {
+func openApiToTfAttribute(path []string, openapi map[string]interface{}, datasource bool) (schema.Attribute, error) {
 	switch ty := openapi["type"]; ty {
 	case "object":
-		attributes, err := propertiesToAttributes(path, openapi)
+		attributes, err := propertiesToAttributes(path, openapi, datasource)
 		if err != nil {
 			return nil, err
 		}
 		return schema.SingleNestedAttribute{
-			Required:   true,
+			Required:   !datasource,
+			Computed:   datasource,
 			Attributes: attributes,
 		}, nil
 	case "array":
@@ -111,23 +116,40 @@ func openApiToTfAttribute(path []string, openapi map[string]interface{}) (schema
 			return nil, fmt.Errorf("object %s has no items", strings.Join(path, ""))
 		}
 
-		attribute, err := openApiToTfAttribute(append(path, "[*]"), items)
+		attribute, err := openApiToTfAttribute(append(path, "[*]"), items, datasource)
 		if err != nil {
 			return nil, err
 		}
 
 		switch attr := attribute.(type) {
 		case schema.SingleNestedAttribute:
-			return schema.ListNestedAttribute{Required: true, NestedObject: objectToNestedObject(attr)}, nil
+			return schema.ListNestedAttribute{
+				Required:     !datasource,
+				Computed:     datasource,
+				NestedObject: objectToNestedObject(attr),
+			}, nil
 		default:
-			return schema.ListAttribute{Required: true, ElementType: attr.GetType()}, nil
+			return schema.ListAttribute{
+				Required:    !datasource,
+				Computed:    datasource,
+				ElementType: attr.GetType(),
+			}, nil
 		}
 	case "string":
-		return schema.StringAttribute{Required: true}, nil
+		return schema.StringAttribute{
+			Required: !datasource,
+			Computed: datasource,
+		}, nil
 	case "integer":
-		return schema.Int64Attribute{Required: true}, nil
+		return schema.Int64Attribute{
+			Required: !datasource,
+			Computed: datasource,
+		}, nil
 	case "boolean":
-		return schema.BoolAttribute{Required: true}, nil
+		return schema.BoolAttribute{
+			Required: !datasource,
+			Computed: datasource,
+		}, nil
 	case "":
 		return nil, fmt.Errorf("schema item has no type at %s", strings.Join(path, ""))
 	default:
@@ -135,7 +157,7 @@ func openApiToTfAttribute(path []string, openapi map[string]interface{}) (schema
 	}
 }
 
-func propertiesToAttributes(path []string, openapi map[string]interface{}) (map[string]schema.Attribute, error) {
+func propertiesToAttributes(path []string, openapi map[string]interface{}, datasource bool) (map[string]schema.Attribute, error) {
 	rawProperties, ok := openapi["properties"]
 	if !ok {
 		return nil, nil
@@ -154,7 +176,7 @@ func propertiesToAttributes(path []string, openapi map[string]interface{}) (map[
 			return nil, fmt.Errorf("expected map of properties at %s", strings.Join(attrPath, ""))
 		}
 
-		attribute, err := openApiToTfAttribute(attrPath, property)
+		attribute, err := openApiToTfAttribute(attrPath, property, datasource)
 		if err != nil {
 			return nil, err
 		}
