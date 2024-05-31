@@ -64,6 +64,25 @@ func valueToObject(value tftypes.Value, typ tftypes.Type, path path.Path) (inter
 			obj[strcase.LowerCamelCase(name)] = field
 		}
 		return obj, diags
+	case tftypes.Map:
+		var tfMap *map[string]tftypes.Value
+		if err := value.As(&tfMap); err != nil {
+			diags.AddAttributeError(path, "Failed to convert to map", err.Error())
+			return nil, diags
+		}
+		if tfMap == nil {
+			return nil, diags
+		}
+		obj := make(map[string]interface{}, len(*tfMap))
+		for name, tfItem := range *tfMap {
+			item, itemDiags := valueToObject(tfItem, typ.ElementType, path.AtMapKey(name))
+			diags.Append(itemDiags...)
+			if itemDiags.HasError() {
+				continue
+			}
+			obj[name] = item
+		}
+		return obj, diags
 	case tftypes.List:
 		var tfSlice *[]tftypes.Value
 		if err := value.As(&tfSlice); err != nil {

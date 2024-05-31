@@ -101,15 +101,40 @@ func openApiToTfSchema(openapi map[string]interface{}, datasource bool) (*schema
 func openApiToTfAttribute(path []string, openapi map[string]interface{}, datasource bool) (schema.Attribute, error) {
 	switch ty := openapi["type"]; ty {
 	case "object":
-		attributes, err := propertiesToAttributes(path, openapi, datasource)
-		if err != nil {
-			return nil, err
+		if rawItems, isMap := openapi["additionalProperties"]; isMap {
+			items, ok := rawItems.(map[string]interface{})
+			if !ok {
+				return nil, fmt.Errorf("expected additionalProperties object at %s", strings.Join(path, ""))
+			}
+			attribute, err := openApiToTfAttribute(append(path, "[*]"), items, datasource)
+			if err != nil {
+				return nil, err
+			}
+			switch attr := attribute.(type) {
+			case schema.SingleNestedAttribute:
+				return schema.MapNestedAttribute{
+					Required:     !datasource,
+					Computed:     datasource,
+					NestedObject: objectToNestedObject(attr),
+				}, nil
+			default:
+				return schema.MapAttribute{
+					Required:    !datasource,
+					Computed:    datasource,
+					ElementType: attr.GetType(),
+				}, nil
+			}
+		} else {
+			attributes, err := propertiesToAttributes(path, openapi, datasource)
+			if err != nil {
+				return nil, err
+			}
+			return schema.SingleNestedAttribute{
+				Required:   !datasource,
+				Computed:   datasource,
+				Attributes: attributes,
+			}, nil
 		}
-		return schema.SingleNestedAttribute{
-			Required:   !datasource,
-			Computed:   datasource,
-			Attributes: attributes,
-		}, nil
 	case "array":
 		items, ok := openapi["items"].(map[string]interface{})
 		if !ok {
@@ -158,14 +183,26 @@ func openApiToTfAttribute(path []string, openapi map[string]interface{}, datasou
 }
 
 func propertiesToAttributes(path []string, openapi map[string]interface{}, datasource bool) (map[string]schema.Attribute, error) {
-	rawProperties, ok := openapi["properties"]
+	properties, ok := openapi["properties"].(map[string]interface{})
 	if !ok {
-		return nil, nil
+		return nil, fmt.Errorf("expected map of properties at %s", strings.Join(path, ""))
 	}
 
-	properties := rawProperties.(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("object has no properties at %s", strings.Join(path, ""))
+	var required map[string]bool
+	rawRequired, found := openapi["required"]
+	if found {
+		requiredKeys, ok := rawRequired.([]interface{})
+		if !ok {
+			return nil, fmt.Errorf("expected list of required attributes at %s", strings.Join(path, ""))
+		}
+		required = make(map[string]bool, len(requiredKeys))
+		for i, k := range requiredKeys {
+			name, ok := k.(string)
+			if !ok {
+				return nil, fmt.Errorf("expected attribute name at %s[%d]", strings.Join(path, ""), i)
+			}
+			required[name] = true
+		}
 	}
 
 	attributes := make(map[string]schema.Attribute, len(properties))
@@ -173,7 +210,7 @@ func propertiesToAttributes(path []string, openapi map[string]interface{}, datas
 		attrPath := append(path, fmt.Sprintf(".%s", k))
 		property, ok := v.(map[string]interface{})
 		if !ok {
-			return nil, fmt.Errorf("expected map of properties at %s", strings.Join(attrPath, ""))
+			return nil, fmt.Errorf("expected object at %s", strings.Join(attrPath, ""))
 		}
 
 		attribute, err := openApiToTfAttribute(attrPath, property, datasource)

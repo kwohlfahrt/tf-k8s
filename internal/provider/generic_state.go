@@ -57,6 +57,22 @@ func objectToValue(obj interface{}, typ tftypes.Type, path path.Path) (*tftypes.
 			tfObj[name] = *fieldValue
 		}
 		obj = tfObj
+	case tftypes.Map:
+		mapObj, ok := obj.(map[string]interface{})
+		if !ok {
+			diags.AddAttributeError(path, "Expected map field", fmt.Sprintf("got %T instead", obj))
+			break
+		}
+		tfObj := make(map[string]tftypes.Value, len(mapObj))
+		for name, fieldObj := range mapObj {
+			fieldValue, fieldDiags := objectToValue(fieldObj, typ.ElementType, path.AtMapKey(name))
+			diags.Append(fieldDiags...)
+			if fieldDiags.HasError() {
+				continue
+			}
+			tfObj[name] = *fieldValue
+		}
+		obj = tfObj
 	case tftypes.List:
 		sliceObj, ok := obj.([]interface{})
 		if !ok {
