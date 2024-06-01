@@ -46,12 +46,13 @@ func objectToValue(obj interface{}, typ tftypes.Type, path path.Path) (*tftypes.
 			fieldName := strcase.LowerCamelCase(name)
 			fieldObj, ok := mapObj[fieldName]
 			if !ok {
-				diags.AddAttributeError(path, "Field not found", fieldName)
+				tfObj[name] = tftypes.NewValue(fieldType, nil)
 				continue
 			}
 			fieldValue, fieldDiags := objectToValue(fieldObj, fieldType, path.AtName(name))
 			diags.Append(fieldDiags...)
 			if fieldDiags.HasError() {
+				tfObj[name] = tftypes.NewValue(fieldType, nil)
 				continue
 			}
 			tfObj[name] = *fieldValue
