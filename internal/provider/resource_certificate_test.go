@@ -14,8 +14,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/statecheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 func TestAccCertificateResource(t *testing.T) {
@@ -24,15 +22,7 @@ func TestAccCertificateResource(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cc, err := clientcmd.NewClientConfigFromBytes(kubeconfig)
-	if err != nil {
-		t.Fatal(err)
-	}
-	cfg, err := cc.ClientConfig()
-	if err != nil {
-		t.Fatal(err)
-	}
-	k, err := dynamic.NewForConfig(cfg)
+	k, err := makeDynamicClient(kubeconfig)
 	if err != nil {
 		t.Fatal(err)
 	}

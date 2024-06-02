@@ -38,6 +38,22 @@ func (p *CrdProvider) Schema(ctx context.Context, req provider.SchemaRequest, re
 	}
 }
 
+func makeDynamicClient(kubeconfig []byte) (*dynamic.DynamicClient, error) {
+	clientConfig, err := clientcmd.NewClientConfigFromBytes(kubeconfig)
+	if err != nil {
+		return nil, err
+	}
+	restConfig, err := clientConfig.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+	client, err := dynamic.NewForConfig(restConfig)
+	if err != nil {
+		return nil, err
+	}
+	return client, nil
+}
+
 func (p *CrdProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
 	var data CrdProviderModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
@@ -45,19 +61,9 @@ func (p *CrdProvider) Configure(ctx context.Context, req provider.ConfigureReque
 		return
 	}
 
-	cc, err := clientcmd.NewClientConfigFromBytes([]byte(data.Kubeconfig.ValueString()))
+	k, err := makeDynamicClient([]byte(data.Kubeconfig.ValueString()))
 	if err != nil {
-		resp.Diagnostics.AddError("Unable to load kubeconfig", err.Error())
-		return
-	}
-	cfg, err := cc.ClientConfig()
-	if err != nil {
-		resp.Diagnostics.AddError("Unable to get client configuration", err.Error())
-		return
-	}
-	k, err := dynamic.NewForConfig(cfg)
-	if err != nil {
-		resp.Diagnostics.AddError("Unable to construct kubernetes client", err.Error())
+		resp.Diagnostics.AddError("Unable to make kubernetes client", err.Error())
 		return
 	}
 
