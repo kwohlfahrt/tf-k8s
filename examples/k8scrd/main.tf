@@ -30,47 +30,6 @@ resource "k8scrd_certificate" "bar" {
       name  = "production"
     }
     secret_name = "bar"
-    # TODO: Make these all optional
-    additional_output_formats = []
-    common_name               = "bar.example.com"
-    duration                  = "1d"
-    email_addresses           = []
-    encode_usages_in_request  = false
-    ip_addresses              = []
-    # FIXME: Commented out  because of casing round-trip issues (isCA -> is_ca -> isCa)
-    # is_ca                     = false
-    keystores = {
-      jks    = { create = false, password_secret_ref = { key = "", name = "" } }
-      pkcs12 = { create = false, profile = "Modern2023", password_secret_ref = { key = "", name = "" } }
-    }
-    literal_subject = ""
-    name_constraints = {
-      critical  = false
-      permitted = { dns_domains = [], uri_domains = [], email_addresses = [], ip_ranges = [] }
-      excluded  = { dns_domains = [], uri_domains = [], email_addresses = [], ip_ranges = [] }
-    }
-    other_names = []
-    private_key = {
-      algorithm       = "ECDSA"
-      encoding        = "PKCS8"
-      rotation_policy = "Never"
-      size            = 256
-    }
-    renew_before           = ""
-    revision_history_limit = 0
-    secret_template        = { annotations = {}, labels = {} }
-    uris                   = []
-    subject = {
-      countries            = []
-      localities           = []
-      organizational_units = []
-      organizations        = []
-      postal_codes         = []
-      provinces            = []
-      serial_number        = ""
-      street_addresses     = []
-    }
-    usages = []
   }
 }
 

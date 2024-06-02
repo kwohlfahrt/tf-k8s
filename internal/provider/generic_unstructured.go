@@ -56,6 +56,10 @@ func valueToObject(value tftypes.Value, typ tftypes.Type, path path.Path) (inter
 
 		obj := make(map[string]interface{}, len(*tfObj))
 		for name, tfField := range *tfObj {
+			if tfField.IsNull() {
+				continue
+			}
+
 			field, fieldDiags := valueToObject(tfField, typ.AttributeTypes[name], path.AtName(name))
 			diags.Append(fieldDiags...)
 			if fieldDiags.HasError() {
@@ -75,6 +79,10 @@ func valueToObject(value tftypes.Value, typ tftypes.Type, path path.Path) (inter
 		}
 		obj := make(map[string]interface{}, len(*tfMap))
 		for name, tfItem := range *tfMap {
+			if tfItem.IsNull() {
+				continue
+			}
+
 			item, itemDiags := valueToObject(tfItem, typ.ElementType, path.AtMapKey(name))
 			diags.Append(itemDiags...)
 			if itemDiags.HasError() {
