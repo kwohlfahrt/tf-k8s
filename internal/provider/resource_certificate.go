@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -26,12 +25,6 @@ func (c *certificateResource) Metadata(ctx context.Context, req resource.Metadat
 }
 
 func (c *certificateResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
-	schemaBytes, err := os.ReadFile("./cert-manager.crds.yaml")
-	if err != nil {
-		resp.Diagnostics.AddError("Unable to read schema file", err.Error())
-		return
-	}
-
 	crd, err := generic.LoadCrd(schemaBytes, "v1")
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to parse schema file", err.Error())

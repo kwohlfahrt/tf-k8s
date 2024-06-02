@@ -82,6 +82,9 @@ func OpenApiToTfSchema(openapi map[string]interface{}, datasource bool) (*schema
 
 	// TODO: Handle status field
 	attributes := make(map[string]schema.Attribute, 2)
+	if !datasource {
+		attributes["id"] = schema.StringAttribute{Computed: true}
+	}
 	attributes["metadata"] = schema.SingleNestedAttribute{
 		Required: true,
 		Attributes: map[string]schema.Attribute{

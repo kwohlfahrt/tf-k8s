@@ -17,14 +17,32 @@ import (
 func ObjectToState(ctx context.Context, state tfsdk.State, obj *unstructured.Unstructured) (attr.Value, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
-	value, objectDiags := objectToValue(obj.UnstructuredContent(), state.Raw.Type(), path.Empty())
-	diags.Append(objectDiags...)
-	if objectDiags.HasError() {
+	content := obj.UnstructuredContent()
+	typ := state.Raw.Type().(tftypes.Object)
+
+	metadata, metadataDiags := objectToValue(content["metadata"], typ.AttributeTypes["metadata"], path.Root("metadata"))
+	diags.Append(metadataDiags...)
+	spec, specDiags := objectToValue(content["spec"], typ.AttributeTypes["spec"], path.Root("spec"))
+	diags.Append(specDiags...)
+
+	valueMap := make(map[string]tftypes.Value, len(typ.AttributeTypes))
+	valueMap["metadata"] = *metadata
+	valueMap["spec"] = *spec
+	if _, needsId := typ.AttributeTypes["id"]; needsId {
+		// TODO: Better error handling here.
+		metadata := content["metadata"].(map[string]interface{})
+		name := metadata["name"].(string)
+		namespace := metadata["namespace"].(string)
+		id := tftypes.NewValue(tftypes.String, fmt.Sprintf("%s/%s", namespace, name))
+		valueMap["id"] = id
+	}
+	value := tftypes.NewValue(typ, valueMap)
+	if diags.HasError() {
 		return nil, diags
 	}
 
 	// TODO: This seems a bit hacky, can we construct an attr.Type directly?
-	stateAttr, err := state.Schema.Type().ValueFromTerraform(ctx, *value)
+	stateAttr, err := state.Schema.Type().ValueFromTerraform(ctx, value)
 	if err != nil {
 		diags.AddError("Error converting to state type", err.Error())
 	}

@@ -3,17 +3,15 @@ package provider
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/path"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/dynamic"
 
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/generic"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type certificateDataSource struct {
@@ -47,12 +45,6 @@ func (c *certificateDataSource) Metadata(ctx context.Context, req datasource.Met
 }
 
 func (c *certificateDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
-	schemaBytes, err := os.ReadFile("./cert-manager.crds.yaml")
-	if err != nil {
-		resp.Diagnostics.AddError("Unable to read schema file", err.Error())
-		return
-	}
-
 	crd, err := generic.LoadCrd(schemaBytes, "v1")
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to parse schema file", err.Error())

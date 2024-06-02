@@ -27,6 +27,9 @@ func StateToObject(ctx context.Context, state tfsdk.Plan) (*unstructured.Unstruc
 	obj["kind"] = "Certificate"
 	obj["apiVersion"] = "cert-manager.io/v1"
 	for name, value := range rawState {
+		if name == "id" {
+			continue
+		}
 		path := path.Root(name)
 		fieldObj, valueDiags := valueToObject(value, value.Type(), path)
 		diags.Append(valueDiags...)
