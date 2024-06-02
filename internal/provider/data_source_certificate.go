@@ -12,6 +12,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/generic"
 )
 
 type certificateDataSource struct {
@@ -51,7 +53,7 @@ func (c *certificateDataSource) Schema(ctx context.Context, req datasource.Schem
 		return
 	}
 
-	crd, err := loadCrd(schemaBytes, "v1")
+	crd, err := generic.LoadCrd(schemaBytes, "v1")
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to parse schema file", err.Error())
 		return
@@ -61,7 +63,7 @@ func (c *certificateDataSource) Schema(ctx context.Context, req datasource.Schem
 		return
 	}
 
-	result, err := openApiToTfSchema(crd, true)
+	result, err := generic.OpenApiToTfSchema(crd, true)
 	if err != nil {
 		resp.Diagnostics.AddError("Could not convert CRD to schema", err.Error())
 		return
@@ -100,7 +102,7 @@ func (c *certificateDataSource) Read(ctx context.Context, req datasource.ReadReq
 		return
 	}
 
-	state, diags := objectToState(ctx, resp.State, obj)
+	state, diags := generic.ObjectToState(ctx, resp.State, obj)
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return

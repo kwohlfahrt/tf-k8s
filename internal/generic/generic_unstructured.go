@@ -1,4 +1,4 @@
-package provider
+package generic
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-func stateToObject(ctx context.Context, state tfsdk.Plan) (*unstructured.Unstructured, diag.Diagnostics) {
+func StateToObject(ctx context.Context, state tfsdk.Plan) (*unstructured.Unstructured, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
 	var rawState map[string]tftypes.Value

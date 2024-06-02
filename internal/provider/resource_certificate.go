@@ -7,6 +7,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/generic"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
@@ -31,7 +32,7 @@ func (c *certificateResource) Schema(ctx context.Context, req resource.SchemaReq
 		return
 	}
 
-	crd, err := loadCrd(schemaBytes, "v1")
+	crd, err := generic.LoadCrd(schemaBytes, "v1")
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to parse schema file", err.Error())
 		return
@@ -41,7 +42,7 @@ func (c *certificateResource) Schema(ctx context.Context, req resource.SchemaReq
 		return
 	}
 
-	result, err := openApiToTfSchema(crd, false)
+	result, err := generic.OpenApiToTfSchema(crd, false)
 	if err != nil {
 		resp.Diagnostics.AddError("Could not convert CRD to schema", err.Error())
 		return
@@ -77,7 +78,7 @@ func (c *certificateResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	obj, diags := stateToObject(ctx, req.Plan)
+	obj, diags := generic.StateToObject(ctx, req.Plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -94,7 +95,7 @@ func (c *certificateResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	state, diags := objectToState(ctx, resp.State, obj)
+	state, diags := generic.ObjectToState(ctx, resp.State, obj)
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
@@ -120,7 +121,7 @@ func (c *certificateResource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 
-	state, diags := objectToState(ctx, resp.State, obj)
+	state, diags := generic.ObjectToState(ctx, resp.State, obj)
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
@@ -135,7 +136,7 @@ func (c *certificateResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
-	obj, diags := stateToObject(ctx, req.Plan)
+	obj, diags := generic.StateToObject(ctx, req.Plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -150,7 +151,7 @@ func (c *certificateResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
-	state, diags := objectToState(ctx, resp.State, obj)
+	state, diags := generic.ObjectToState(ctx, resp.State, obj)
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return

@@ -1,4 +1,4 @@
-package provider
+package generic
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/yaml"
 )
 
-func loadCrd(bytes []byte, requiredVersion string) (map[string]interface{}, error) {
+func LoadCrd(bytes []byte, requiredVersion string) (map[string]interface{}, error) {
 	decoder := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
 	obj := &unstructured.Unstructured{}
 
@@ -60,7 +60,7 @@ func loadCrd(bytes []byte, requiredVersion string) (map[string]interface{}, erro
 	return nil, nil
 }
 
-func openApiToTfSchema(openapi map[string]interface{}, datasource bool) (*schema.Schema, error) {
+func OpenApiToTfSchema(openapi map[string]interface{}, datasource bool) (*schema.Schema, error) {
 	if ty := openapi["type"]; ty != "object" {
 		return nil, fmt.Errorf("expected object, got type: %s", ty)
 	}
