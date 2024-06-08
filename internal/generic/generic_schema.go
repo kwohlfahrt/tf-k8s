@@ -75,7 +75,11 @@ func OpenApiToTfSchema(openapi map[string]interface{}, datasource bool) (*schema
 		return nil, fmt.Errorf("object spec has invalid properties")
 	}
 
-	spec, err := propertiesToAttributes(datasource, []string{"spec"}, specProperties)
+	spec, err := propertiesToAttributes(datasource, []string{"spec."}, specProperties)
+	if err != nil {
+		return nil, err
+	}
+	customType, err := FromOpenApi(specProperties, []string{"spec."})
 	if err != nil {
 		return nil, err
 	}
@@ -96,6 +100,7 @@ func OpenApiToTfSchema(openapi map[string]interface{}, datasource bool) (*schema
 		Required:   !datasource,
 		Computed:   datasource,
 		Attributes: spec,
+		CustomType: customType,
 	}
 
 	return &schema.Schema{Attributes: attributes}, nil
@@ -143,11 +148,16 @@ func openApiToTfAttribute(config config, path []string, openapi map[string]inter
 			if err != nil {
 				return nil, err
 			}
+			customType, err := FromOpenApi(openapi, path)
+			if err != nil {
+				return nil, err
+			}
 			return schema.SingleNestedAttribute{
 				Required:   required,
 				Optional:   optional,
 				Computed:   computed,
 				Attributes: attributes,
+				CustomType: customType,
 			}, nil
 		}
 	case "array":
@@ -226,6 +236,7 @@ func propertiesToAttributes(datasource bool, path []string, openapi map[string]i
 	}
 
 	attributes := make(map[string]schema.Attribute, len(properties))
+	fieldNames := make(map[string]string, len(properties))
 	for k, v := range properties {
 		attrPath := append(path, fmt.Sprintf(".%s", k))
 		property, ok := v.(map[string]interface{})
@@ -238,7 +249,9 @@ func propertiesToAttributes(datasource bool, path []string, openapi map[string]i
 		if err != nil {
 			return nil, err
 		}
-		attributes[strcase.SnakeCase(k)] = attribute
+		fieldName := strcase.SnakeCase(k)
+		attributes[fieldName] = attribute
+		fieldNames[fieldName] = k
 	}
 	return attributes, nil
 }
