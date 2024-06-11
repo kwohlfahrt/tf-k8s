@@ -33,3 +33,25 @@ func TestRequiredFields(t *testing.T) {
 		t.Error("Expected attribute spec.x to not be required")
 	}
 }
+
+func TestFieldType(t *testing.T) {
+	crd, err := LoadCrd(schemaBytes, "v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if crd == nil {
+		t.Fatal("CRD version not found: v1")
+	}
+
+	result, err := OpenApiToTfSchema(context.Background(), crd, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	spec := result.Attributes["spec"].(schema.SingleNestedAttribute)
+	if _, ok := spec.Attributes["x"].(schema.StringAttribute); !ok {
+		t.Error("Expected attribute spec.x to be string attribute")
+	}
+	if _, ok := spec.Attributes["y"].(schema.StringAttribute); !ok {
+		t.Error("Expected attribute spec.y to be string attribute")
+	}
+}

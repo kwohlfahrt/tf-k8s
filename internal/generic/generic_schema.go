@@ -74,12 +74,12 @@ func OpenApiToTfSchema(ctx context.Context, openapi map[string]interface{}, data
 		return nil, fmt.Errorf("object spec has invalid properties")
 	}
 
-	customType, err := FromOpenApi(specProperties, []string{"spec"})
+	customType, err := ObjectFromOpenApi(specProperties, []string{"spec"})
 	if err != nil {
 		return nil, err
 	}
 
-	specAttributes, err := customType.SchemaAttributes(ctx, datasource)
+	specAttribute, err := customType.SchemaType(ctx, datasource, !datasource)
 	if err != nil {
 		return nil, err
 	}
@@ -96,12 +96,7 @@ func OpenApiToTfSchema(ctx context.Context, openapi map[string]interface{}, data
 			"namespace": schema.StringAttribute{Required: true},
 		},
 	}
-	attributes["spec"] = schema.SingleNestedAttribute{
-		Required:   !datasource,
-		Computed:   datasource,
-		Attributes: specAttributes,
-		CustomType: *customType,
-	}
+	attributes["spec"] = specAttribute
 
 	return &schema.Schema{Attributes: attributes}, nil
 }

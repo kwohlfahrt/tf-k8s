@@ -13,6 +13,10 @@ import (
 	strcase "github.com/stoewer/go-strcase"
 )
 
+type KubernetesType interface {
+	SchemaType(ctx context.Context, isDatasource, isRequired bool) (schema.Attribute, error)
+}
+
 type KubernetesObjectType struct {
 	basetypes.ObjectType
 
@@ -66,71 +70,47 @@ func (t KubernetesObjectType) ValueType(ctx context.Context) attr.Value {
 	}
 }
 
-func (t KubernetesObjectType) SchemaAttributes(ctx context.Context, isDatasource bool) (map[string]schema.Attribute, error) {
-	result := make(map[string]schema.Attribute, len(t.AttrTypes))
+func (t KubernetesObjectType) SchemaAttributes(ctx context.Context, isDatasource bool, isRequired bool) (map[string]schema.Attribute, error) {
+	attributes := make(map[string]schema.Attribute, len(t.AttrTypes))
 	for k, attr := range t.AttrTypes {
 		isRequired := t.requiredFields[k]
-		schemaType, err := attrTypeToSchemaType(ctx, attr, isDatasource, isRequired)
+		var schemaType schema.Attribute
+		var err error
+
+		if kubernetesAttr, ok := attr.(KubernetesType); ok {
+			schemaType, err = kubernetesAttr.SchemaType(ctx, isDatasource, isRequired)
+		} else {
+			schemaType, err = primitiveSchemaType(ctx, attr, isDatasource, isRequired)
+		}
+
 		if err != nil {
 			return nil, err
 		}
-		result[k] = schemaType
+		attributes[k] = schemaType
 	}
-	return result, nil
+	return attributes, nil
 }
 
-func attrTypeToSchemaType(ctx context.Context, attr attr.Type, isDatasource, isRequired bool) (schema.Attribute, error) {
+func (t KubernetesObjectType) SchemaType(ctx context.Context, isDatasource bool, isRequired bool) (schema.Attribute, error) {
+	computed := isDatasource
+	optional := !isDatasource && !isRequired
+	required := !isDatasource && isRequired
+
+	attributes, err := t.SchemaAttributes(ctx, isDatasource, isRequired)
+	if err != nil {
+		return nil, err
+	}
+
+	return schema.SingleNestedAttribute{Required: required, Optional: optional, Computed: computed, Attributes: attributes}, nil
+}
+
+func primitiveSchemaType(_ context.Context, attr attr.Type, isDatasource, isRequired bool) (schema.Attribute, error) {
 	computed := isDatasource
 	optional := !isDatasource && !isRequired
 	required := !isDatasource && isRequired
 	var schemaType schema.Attribute
 
 	switch attr := attr.(type) {
-	case KubernetesObjectType:
-		attributes, err := attr.SchemaAttributes(ctx, isDatasource)
-		if err != nil {
-			return nil, err
-		}
-		schemaType = schema.SingleNestedAttribute{
-			Required:   required,
-			Optional:   optional,
-			Computed:   computed,
-			Attributes: attributes,
-		}
-	case basetypes.MapType:
-		elem := attr.ElementType()
-		switch elem := elem.(type) {
-		case KubernetesObjectType:
-			attributes, err := elem.SchemaAttributes(ctx, isDatasource)
-			if err != nil {
-				return nil, err
-			}
-			schemaType = schema.MapNestedAttribute{
-				Required:     required,
-				Optional:     optional,
-				Computed:     computed,
-				NestedObject: schema.NestedAttributeObject{Attributes: attributes, CustomType: elem},
-			}
-		default:
-			schemaType = schema.MapAttribute{Required: required, Optional: optional, Computed: computed, ElementType: elem}
-		}
-	case basetypes.ListType:
-		elem := attr.ElementType()
-		switch elem := elem.(type) {
-		case KubernetesObjectType:
-			attributes, err := elem.SchemaAttributes(ctx, isDatasource)
-			if err != nil {
-				return nil, err
-			}
-			schemaType = schema.ListNestedAttribute{
-				Required:     required,
-				Optional:     optional,
-				Computed:     computed,
-				NestedObject: schema.NestedAttributeObject{Attributes: attributes, CustomType: elem},
-			}
-		default:
-			schemaType = schema.ListAttribute{Required: required, Optional: optional, Computed: computed, ElementType: elem}
-		}
 	case basetypes.StringType:
 		schemaType = schema.StringAttribute{Required: required, Optional: optional, Computed: computed}
 	case basetypes.Int64Type:
@@ -143,7 +123,7 @@ func attrTypeToSchemaType(ctx context.Context, attr attr.Type, isDatasource, isR
 	return schemaType, nil
 }
 
-func FromOpenApi(openapi map[string]interface{}, path []string) (*KubernetesObjectType, error) {
+func ObjectFromOpenApi(openapi map[string]interface{}, path []string) (*KubernetesObjectType, error) {
 	properties, ok := openapi["properties"].(map[string]interface{})
 	if !ok {
 		return nil, fmt.Errorf("expected map of properties at %s", strings.Join(path, ""))
@@ -195,34 +175,26 @@ func FromOpenApi(openapi map[string]interface{}, path []string) (*KubernetesObje
 func openApiToTfType(openapi map[string]interface{}, path []string) (attr.Type, error) {
 	switch ty := openapi["type"]; ty {
 	case "object":
-		if rawItems, isMap := openapi["additionalProperties"]; isMap {
-			items, ok := rawItems.(map[string]interface{})
-			if !ok {
-				return nil, fmt.Errorf("expected additionalProperties object at %s", strings.Join(path, ""))
-			}
-			attribute, err := openApiToTfType(items, append(path, "[*]"))
+		if _, isMap := openapi["additionalProperties"]; isMap {
+			attribute, err := MapFromOpenApi(openapi, path)
 			if err != nil {
 				return nil, err
 			}
-			return basetypes.MapType{ElemType: attribute}, nil
+			return *attribute, err
 		} else {
-			attribute, err := FromOpenApi(openapi, path)
+			attribute, err := ObjectFromOpenApi(openapi, path)
 			if err != nil {
 				return nil, err
 			}
 			return *attribute, nil
 		}
 	case "array":
-		items, ok := openapi["items"].(map[string]interface{})
-		if !ok {
-			return nil, fmt.Errorf("object %s has no items", strings.Join(path, ""))
-		}
-
-		attribute, err := openApiToTfType(items, append(path, "[*]"))
+		// TODO: Handle pointer dereference here cleanly, ideally by not returning a pointer in the factory
+		attribute, err := ListFromOpenApi(openapi, path)
 		if err != nil {
 			return nil, err
 		}
-		return basetypes.ListType{ElemType: attribute}, nil
+		return *attribute, nil
 	case "string":
 		return basetypes.StringType{}, nil
 	case "integer":
