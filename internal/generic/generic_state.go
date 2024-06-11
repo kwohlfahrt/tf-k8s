@@ -7,7 +7,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	strcase "github.com/stoewer/go-strcase"
@@ -117,22 +116,4 @@ func objectToValue(obj interface{}, typ tftypes.Type, path path.Path) (*tftypes.
 
 	tfValue := tftypes.NewValue(typ, obj)
 	return &tfValue, diags
-}
-
-func nestedObjectToObject(attr schema.NestedAttributeObject) schema.SingleNestedAttribute {
-	return schema.SingleNestedAttribute{
-		Attributes:    attr.Attributes,
-		CustomType:    attr.CustomType,
-		Validators:    attr.Validators,
-		PlanModifiers: attr.PlanModifiers,
-	}
-}
-
-func objectToNestedObject(attr schema.SingleNestedAttribute) schema.NestedAttributeObject {
-	return schema.NestedAttributeObject{
-		Attributes:    attr.Attributes,
-		CustomType:    attr.CustomType,
-		Validators:    attr.Validators,
-		PlanModifiers: attr.PlanModifiers,
-	}
 }

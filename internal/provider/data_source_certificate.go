@@ -55,7 +55,7 @@ func (c *certificateDataSource) Schema(ctx context.Context, req datasource.Schem
 		return
 	}
 
-	result, err := generic.OpenApiToTfSchema(crd, true)
+	result, err := generic.OpenApiToTfSchema(ctx, crd, true)
 	if err != nil {
 		resp.Diagnostics.AddError("Could not convert CRD to schema", err.Error())
 		return
