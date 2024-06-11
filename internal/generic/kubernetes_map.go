@@ -82,7 +82,7 @@ func (t KubernetesMapType) SchemaType(ctx context.Context, isDatasource bool, is
 	}
 }
 
-func MapFromOpenApi(openapi map[string]interface{}, path []string) (*KubernetesMapType, error) {
+func MapFromOpenApi(openapi map[string]interface{}, path []string) (KubernetesType, error) {
 	items, ok := openapi["additionalProperties"].(map[string]interface{})
 	if !ok {
 		return nil, fmt.Errorf("expected map of items at %s", strings.Join(path, ""))
@@ -93,7 +93,7 @@ func MapFromOpenApi(openapi map[string]interface{}, path []string) (*KubernetesM
 		return nil, err
 	}
 
-	return &KubernetesMapType{MapType: basetypes.MapType{ElemType: elemType}}, nil
+	return KubernetesMapType{MapType: basetypes.MapType{ElemType: elemType}}, nil
 }
 
 var _ basetypes.MapTypable = KubernetesMapType{}

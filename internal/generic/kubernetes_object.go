@@ -14,6 +14,8 @@ import (
 )
 
 type KubernetesType interface {
+	attr.Type
+
 	SchemaType(ctx context.Context, isDatasource, isRequired bool) (schema.Attribute, error)
 }
 
@@ -123,7 +125,7 @@ func primitiveSchemaType(_ context.Context, attr attr.Type, isDatasource, isRequ
 	return schemaType, nil
 }
 
-func ObjectFromOpenApi(openapi map[string]interface{}, path []string) (*KubernetesObjectType, error) {
+func ObjectFromOpenApi(openapi map[string]interface{}, path []string) (KubernetesType, error) {
 	properties, ok := openapi["properties"].(map[string]interface{})
 	if !ok {
 		return nil, fmt.Errorf("expected map of properties at %s", strings.Join(path, ""))
@@ -165,7 +167,7 @@ func ObjectFromOpenApi(openapi map[string]interface{}, path []string) (*Kubernet
 		requiredFields[strcase.SnakeCase(fieldName)] = true
 	}
 
-	return &KubernetesObjectType{
+	return KubernetesObjectType{
 		ObjectType:     basetypes.ObjectType{AttrTypes: attrTypes},
 		fieldNames:     fieldNames,
 		requiredFields: requiredFields,
@@ -176,25 +178,12 @@ func openApiToTfType(openapi map[string]interface{}, path []string) (attr.Type, 
 	switch ty := openapi["type"]; ty {
 	case "object":
 		if _, isMap := openapi["additionalProperties"]; isMap {
-			attribute, err := MapFromOpenApi(openapi, path)
-			if err != nil {
-				return nil, err
-			}
-			return *attribute, err
+			return MapFromOpenApi(openapi, path)
 		} else {
-			attribute, err := ObjectFromOpenApi(openapi, path)
-			if err != nil {
-				return nil, err
-			}
-			return *attribute, nil
+			return ObjectFromOpenApi(openapi, path)
 		}
 	case "array":
-		// TODO: Handle pointer dereference here cleanly, ideally by not returning a pointer in the factory
-		attribute, err := ListFromOpenApi(openapi, path)
-		if err != nil {
-			return nil, err
-		}
-		return *attribute, nil
+		return ListFromOpenApi(openapi, path)
 	case "string":
 		return basetypes.StringType{}, nil
 	case "integer":
