@@ -69,16 +69,23 @@ func (t KubernetesMapType) SchemaType(ctx context.Context, isDatasource bool, is
 			return nil, err
 		}
 		return schema.MapNestedAttribute{
-			Required: required,
-			Optional: optional,
-			Computed: computed,
+			Required:   required,
+			Optional:   optional,
+			Computed:   computed,
+			CustomType: t,
 			NestedObject: schema.NestedAttributeObject{
 				Attributes: attributes,
 				CustomType: objectElem,
 			},
 		}, nil
 	} else {
-		return schema.MapAttribute{Required: required, Optional: optional, Computed: computed, ElementType: elem}, nil
+		return schema.MapAttribute{
+			Required:    required,
+			Optional:    optional,
+			Computed:    computed,
+			CustomType:  t,
+			ElementType: elem,
+		}, nil
 	}
 }
 

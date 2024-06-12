@@ -103,7 +103,13 @@ func (t KubernetesObjectType) SchemaType(ctx context.Context, isDatasource bool,
 		return nil, err
 	}
 
-	return schema.SingleNestedAttribute{Required: required, Optional: optional, Computed: computed, Attributes: attributes}, nil
+	return schema.SingleNestedAttribute{
+		Required:   required,
+		Optional:   optional,
+		Computed:   computed,
+		Attributes: attributes,
+		CustomType: t,
+	}, nil
 }
 
 func primitiveSchemaType(_ context.Context, attr attr.Type, isDatasource, isRequired bool) (schema.Attribute, error) {

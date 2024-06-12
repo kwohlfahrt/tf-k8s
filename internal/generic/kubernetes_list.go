@@ -69,16 +69,23 @@ func (t KubernetesListType) SchemaType(ctx context.Context, isDatasource bool, i
 			return nil, err
 		}
 		return schema.ListNestedAttribute{
-			Required: required,
-			Optional: optional,
-			Computed: computed,
+			Required:   required,
+			Optional:   optional,
+			Computed:   computed,
+			CustomType: t,
 			NestedObject: schema.NestedAttributeObject{
 				Attributes: attributes,
 				CustomType: objectElem,
 			},
 		}, nil
 	} else {
-		return schema.ListAttribute{Required: required, Optional: optional, Computed: computed, ElementType: elem}, nil
+		return schema.ListAttribute{
+			Required:    required,
+			Optional:    optional,
+			Computed:    computed,
+			CustomType:  t,
+			ElementType: elem,
+		}, nil
 	}
 }
 
