@@ -18,6 +18,7 @@ type KubernetesType interface {
 	attr.Type
 
 	SchemaType(ctx context.Context, isDatasource, isRequired bool) (schema.Attribute, error)
+	ValueFromUnstructured(ctx context.Context, path path.Path, obj interface{}) (attr.Value, diag.Diagnostics)
 }
 
 type KubernetesObjectType struct {
@@ -71,6 +72,58 @@ func (t KubernetesObjectType) ValueType(ctx context.Context) attr.Value {
 	return KubernetesObjectValue{
 		fieldNames: t.fieldNames,
 	}
+}
+
+func (t KubernetesObjectType) ValueFromUnstructured(ctx context.Context, path path.Path, obj interface{}) (attr.Value, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	mapObj, ok := obj.(map[string]interface{})
+	if !ok {
+		diags.Append(diag.NewAttributeErrorDiagnostic(
+			path, "Unexpected value type",
+			fmt.Sprintf("Expected map of properties, got %T", obj),
+		))
+		return nil, diags
+	}
+
+	attributes := make(map[string]attr.Value, len(mapObj))
+	for k, attrType := range t.AttrTypes {
+		fieldPath := path.AtName(k)
+		fieldName, found := t.fieldNames[k]
+		if !found {
+			diags.Append(diag.NewAttributeErrorDiagnostic(
+				fieldPath, "Unexpected field",
+				"Field does not have a mapping to a Kubernetes property. This is a provider-internal error, please report it!",
+			))
+			attributes[k] = newNull(ctx, attrType)
+			continue
+		}
+		value, found := mapObj[fieldName]
+		if !found {
+			attributes[k] = newNull(ctx, attrType)
+			continue
+		}
+
+		var attr attr.Value
+		var attrDiags diag.Diagnostics
+
+		if kubernetesAttrType, ok := attrType.(KubernetesType); ok {
+			attr, attrDiags = kubernetesAttrType.ValueFromUnstructured(ctx, fieldPath, value)
+		} else {
+			attr, attrDiags = primitiveFromUnstructured(ctx, fieldPath, attrType, value)
+		}
+		diags.Append(attrDiags...)
+		if attrDiags.HasError() {
+			continue
+		}
+		attributes[k] = attr
+	}
+
+	baseObj, objDiags := basetypes.NewObjectValue(t.AttrTypes, attributes)
+	diags.Append(objDiags...)
+	result, objDiags := t.ValueFromObject(ctx, baseObj)
+	diags.Append(objDiags...)
+
+	return result, diags
 }
 
 func (t KubernetesObjectType) SchemaAttributes(ctx context.Context, isDatasource bool, isRequired bool) (map[string]schema.Attribute, error) {

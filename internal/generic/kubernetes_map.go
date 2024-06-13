@@ -58,6 +58,43 @@ func (t KubernetesMapType) ValueType(ctx context.Context) attr.Value {
 	return KubernetesMapValue{}
 }
 
+func (t KubernetesMapType) ValueFromUnstructured(ctx context.Context, path path.Path, obj interface{}) (attr.Value, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	mapObj, ok := obj.(map[string]interface{})
+	if !ok {
+		diags.Append(diag.NewAttributeErrorDiagnostic(
+			path, "Unexpected value type",
+			fmt.Sprintf("Expected map of items, got %T", obj),
+		))
+		return nil, diags
+	}
+
+	elems := make(map[string]attr.Value, len(mapObj))
+	for k, value := range mapObj {
+		elemPath := path.AtMapKey(k)
+
+		var elem attr.Value
+		var attrDiags diag.Diagnostics
+		if kubernetesElem, ok := t.ElemType.(KubernetesType); ok {
+			elem, attrDiags = kubernetesElem.ValueFromUnstructured(ctx, elemPath, value)
+		} else {
+			elem, attrDiags = primitiveFromUnstructured(ctx, elemPath, t.ElemType, value)
+		}
+		diags.Append(attrDiags...)
+		if attrDiags.HasError() {
+			continue
+		}
+		elems[k] = elem
+	}
+
+	baseMap, mapDiags := basetypes.NewMapValue(t.ElemType, elems)
+	diags.Append(mapDiags...)
+	result, mapDiags := t.ValueFromMap(ctx, baseMap)
+	diags.Append(mapDiags...)
+
+	return result, diags
+}
+
 func (t KubernetesMapType) SchemaType(ctx context.Context, isDatasource bool, isRequired bool) (schema.Attribute, error) {
 	computed := isDatasource
 	optional := !isDatasource && !isRequired

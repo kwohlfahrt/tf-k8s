@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
 func primitiveSchemaType(_ context.Context, attr attr.Type, isDatasource, isRequired bool) (schema.Attribute, error) {
@@ -47,4 +48,44 @@ func primitiveToUnstructured(ctx context.Context, path path.Path, val attr.Value
 			fmt.Sprintf("Conversion to Kubernetes value is not implemented for %T", val),
 		)}
 	}
+}
+
+func primitiveFromUnstructured(ctx context.Context, path path.Path, typ attr.Type, val interface{}) (attr.Value, diag.Diagnostics) {
+	switch typ := typ.(type) {
+	case basetypes.StringTypable:
+		stringVal, ok := val.(string)
+		if !ok {
+			return nil, []diag.Diagnostic{diag.NewAttributeErrorDiagnostic(
+				path, "Unexpected value", fmt.Sprintf("Expected string, got %T", val),
+			)}
+		}
+		return typ.ValueFromString(ctx, basetypes.NewStringValue(stringVal))
+	case basetypes.Int64Typable:
+		intVal, ok := val.(int64)
+		if !ok {
+			return nil, []diag.Diagnostic{diag.NewAttributeErrorDiagnostic(
+				path, "Unexpected value", fmt.Sprintf("Expected int64, got %T", val),
+			)}
+		}
+		return typ.ValueFromInt64(ctx, basetypes.NewInt64Value(intVal))
+	case basetypes.BoolTypable:
+		boolVal, ok := val.(bool)
+		if !ok {
+			return nil, []diag.Diagnostic{diag.NewAttributeErrorDiagnostic(
+				path, "Unexpected value", fmt.Sprintf("Expected bool, got %T", val),
+			)}
+		}
+		return typ.ValueFromBool(ctx, basetypes.NewBoolValue(boolVal))
+	default:
+		return nil, diag.Diagnostics{diag.NewAttributeErrorDiagnostic(
+			path, "Unimplemented value type",
+			fmt.Sprintf("Conversion to Kubernetes value is not implemented for %T", val),
+		)}
+	}
+}
+
+func newNull(ctx context.Context, typ attr.Type) attr.Value {
+	// AFAIK, this can never throw an error when called this way
+	val, _ := typ.ValueFromTerraform(ctx, tftypes.NewValue(typ.TerraformType(ctx), nil))
+	return val
 }

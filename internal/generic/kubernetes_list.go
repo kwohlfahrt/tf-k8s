@@ -58,6 +58,43 @@ func (t KubernetesListType) ValueType(ctx context.Context) attr.Value {
 	return KubernetesListValue{}
 }
 
+func (t KubernetesListType) ValueFromUnstructured(ctx context.Context, path path.Path, obj interface{}) (attr.Value, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	sliceObj, ok := obj.([]interface{})
+	if !ok {
+		diags.Append(diag.NewAttributeErrorDiagnostic(
+			path, "Unexpected value type",
+			fmt.Sprintf("Expected list of items, got %T", obj),
+		))
+		return nil, diags
+	}
+
+	elems := make([]attr.Value, 0, len(sliceObj))
+	for i, value := range sliceObj {
+		elemPath := path.AtListIndex(i)
+
+		var elem attr.Value
+		var attrDiags diag.Diagnostics
+		if kubernetesElem, ok := t.ElemType.(KubernetesType); ok {
+			elem, attrDiags = kubernetesElem.ValueFromUnstructured(ctx, elemPath, value)
+		} else {
+			elem, attrDiags = primitiveFromUnstructured(ctx, elemPath, t.ElemType, value)
+		}
+		diags.Append(attrDiags...)
+		if attrDiags.HasError() {
+			continue
+		}
+		elems = append(elems, elem)
+	}
+
+	baseList, listDiags := basetypes.NewListValue(t.ElemType, elems)
+	diags.Append(listDiags...)
+	result, listDiags := t.ValueFromList(ctx, baseList)
+	diags.Append(listDiags...)
+
+	return result, diags
+}
+
 func (t KubernetesListType) SchemaType(ctx context.Context, isDatasource bool, isRequired bool) (schema.Attribute, error) {
 	computed := isDatasource
 	optional := !isDatasource && !isRequired
