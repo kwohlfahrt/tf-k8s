@@ -43,6 +43,7 @@ func TestAccCertificateResource(t *testing.T) {
 					"spec": map[string]interface{}{
 						"dns_names":   []string{"bar.example.com"},
 						"secret_name": "bar",
+						"is_ca":       true,
 						"issuer_ref": map[string]interface{}{
 							"group": "cert-manager.io",
 							"kind":  "ClusterIssuer",
@@ -80,6 +81,11 @@ func TestAccCertificateResource(t *testing.T) {
 						"k8scrd_certificate.bar",
 						tfjsonpath.New("spec").AtMapKey("dns_names").AtSliceIndex(0),
 						knownvalue.StringExact("bar.example.com"),
+					),
+					statecheck.ExpectKnownValue(
+						"k8scrd_certificate.bar",
+						tfjsonpath.New("spec").AtMapKey("is_ca"),
+						knownvalue.Bool(true),
 					),
 				},
 				Check: func(s *terraform.State) error {
