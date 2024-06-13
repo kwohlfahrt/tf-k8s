@@ -7,6 +7,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
@@ -202,6 +203,13 @@ func openApiToTfType(openapi map[string]interface{}, path []string) (attr.Type, 
 }
 
 var _ basetypes.ObjectTypable = KubernetesObjectType{}
+var _ KubernetesType = KubernetesObjectType{}
+
+type KubernetesValue interface {
+	attr.Value
+
+	ToUnstructured(ctx context.Context, path path.Path) (interface{}, diag.Diagnostics)
+}
 
 type KubernetesObjectValue struct {
 	basetypes.ObjectValue
@@ -226,4 +234,60 @@ func (v KubernetesObjectValue) Type(ctx context.Context) attr.Type {
 	}
 }
 
+func (v KubernetesObjectValue) ToUnstructured(ctx context.Context, path path.Path) (interface{}, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	attributes := v.Attributes()
+	result := make(map[string]interface{}, len(attributes))
+	for k, attr := range attributes {
+		if attr.IsNull() {
+			continue
+		}
+
+		fieldPath := path.AtName(k)
+		fieldName, found := v.fieldNames[k]
+		if !found {
+			diags.Append(diag.NewAttributeErrorDiagnostic(
+				fieldPath, "Unexpected field",
+				"Field does not have a mapping to a Kubernetes property. This is a provider-internal error, please report it!",
+			))
+			continue
+		}
+		var attrObj interface{}
+		var attrDiags diag.Diagnostics
+		if kubernetesAttr, ok := attr.(KubernetesValue); ok {
+			attrObj, attrDiags = kubernetesAttr.ToUnstructured(ctx, fieldPath)
+		} else {
+			attrObj, attrDiags = primitiveToUnstructured(ctx, fieldPath, attr)
+		}
+		diags.Append(attrDiags...)
+		if attrDiags.HasError() {
+			continue
+		}
+
+		result[fieldName] = attrObj
+	}
+
+	return result, diags
+}
+
+func primitiveToUnstructured(ctx context.Context, path path.Path, val attr.Value) (interface{}, diag.Diagnostics) {
+	switch val := val.(type) {
+	case basetypes.StringValuable:
+		stringVal, diags := val.ToStringValue(ctx)
+		return stringVal.ValueString(), diags
+	case basetypes.Int64Valuable:
+		intVal, diags := val.ToInt64Value(ctx)
+		return intVal.ValueInt64(), diags
+	case basetypes.BoolValuable:
+		boolVal, diags := val.ToBoolValue(ctx)
+		return boolVal.ValueBool(), diags
+	default:
+		return nil, diag.Diagnostics{diag.NewAttributeErrorDiagnostic(
+			path, "Unimplemented value type",
+			fmt.Sprintf("Conversion to Kubernetes value is not implemented for %T", val),
+		)}
+	}
+}
+
 var _ basetypes.ObjectValuable = KubernetesObjectValue{}
+var _ KubernetesValue = KubernetesObjectValue{}

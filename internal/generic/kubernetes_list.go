@@ -7,6 +7,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
@@ -104,9 +105,32 @@ func ListFromOpenApi(openapi map[string]interface{}, path []string) (KubernetesT
 }
 
 var _ basetypes.ListTypable = KubernetesListType{}
+var _ KubernetesType = KubernetesListType{}
 
 type KubernetesListValue struct {
 	basetypes.ListValue
+}
+
+func (v KubernetesListValue) ToUnstructured(ctx context.Context, path path.Path) (interface{}, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	elems := v.ListValue.Elements()
+	result := make([]interface{}, 0, len(elems))
+	for i, elem := range elems {
+		elemPath := path.AtListIndex(i)
+		var elemObj interface{}
+		var elemDiags diag.Diagnostics
+		if kubernetesAttr, ok := elem.(KubernetesValue); ok {
+			elemObj, elemDiags = kubernetesAttr.ToUnstructured(ctx, elemPath)
+		} else {
+			elemObj, elemDiags = primitiveToUnstructured(ctx, elemPath, elem)
+		}
+		diags.Append(elemDiags...)
+		if elemDiags.HasError() {
+			continue
+		}
+		result = append(result, elemObj)
+	}
+	return result, nil
 }
 
 func (v KubernetesListValue) Equal(o attr.Value) bool {
@@ -122,3 +146,4 @@ func (v KubernetesListValue) Type(ctx context.Context) attr.Type {
 }
 
 var _ basetypes.ListValuable = KubernetesListValue{}
+var _ KubernetesValue = KubernetesListValue{}

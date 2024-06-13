@@ -21,24 +21,25 @@ func StateToObject(ctx context.Context, state tfsdk.Plan) (*unstructured.Unstruc
 		diags.AddError("Expected object type", fmt.Sprintf("got %s instead", state.Raw.Type().String()))
 	}
 
-	obj := make(map[string]interface{}, len(rawState)+2)
+	obj := make(map[string]interface{}, 4)
 
 	// TODO: Don't hard-code this
 	obj["kind"] = "Certificate"
 	obj["apiVersion"] = "cert-manager.io/v1"
-	for name, value := range rawState {
-		if name == "id" {
-			continue
-		}
-		path := path.Root(name)
-		fieldObj, valueDiags := valueToObject(value, value.Type(), path)
-		diags.Append(valueDiags...)
-		if valueDiags.HasError() {
-			continue
-		}
-		obj[strcase.LowerCamelCase(name)] = fieldObj
+	rawMetadata := rawState["metadata"]
+	metadataObj, metadataDiags := valueToObject(rawMetadata, rawMetadata.Type(), path.Root("metadata"))
+	diags.Append(metadataDiags...)
+	obj["metadata"] = metadataObj
+
+	var specObj KubernetesObjectValue
+	diags.Append(state.GetAttribute(ctx, path.Root("spec"), &specObj)...)
+	spec, specDiags := specObj.ToUnstructured(ctx, path.Root("spec"))
+	diags.Append(specDiags...)
+	if !specDiags.HasError() {
+		obj["spec"] = spec
 	}
 
+	// Returned object may be inconsistent, if `diags` contains an error
 	return &unstructured.Unstructured{Object: obj}, diags
 }
 
