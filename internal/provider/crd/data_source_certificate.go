@@ -1,4 +1,4 @@
-package provider
+package crd
 
 import (
 	"context"
@@ -83,7 +83,7 @@ func (c *certificateDataSource) Read(ctx context.Context, req datasource.ReadReq
 		return
 	}
 
-	obj, err := c.client.Resource(certificateGvr).Namespace(metadata.Namespace).
+	obj, err := c.client.Resource(CertificateGvr).Namespace(metadata.Namespace).
 		Get(ctx, metadata.Name, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsGone(err) || errors.IsNotFound(err) {

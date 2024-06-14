@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/serializer/yaml"
 )
@@ -74,7 +75,7 @@ func OpenApiToTfSchema(ctx context.Context, openapi map[string]interface{}, data
 		return nil, fmt.Errorf("object spec has invalid properties")
 	}
 
-	customType, err := ObjectFromOpenApi(specProperties, []string{"spec"})
+	customType, err := types.ObjectFromOpenApi(specProperties, []string{"spec"})
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +85,7 @@ func OpenApiToTfSchema(ctx context.Context, openapi map[string]interface{}, data
 		return nil, err
 	}
 
-	metaAttribute, err := metadataType.SchemaType(ctx, false, true)
+	metaAttribute, err := types.MetadataType.SchemaType(ctx, false, true)
 	if err != nil {
 		return nil, err
 	}

@@ -1,16 +1,17 @@
-package provider
+package crd_test
 
 import (
 	"context"
 	"fmt"
 
+	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/provider/crd"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 )
 
 func assertExists(client *dynamic.DynamicClient, namespace string, name string, exists bool) error {
-	_, err := client.Resource(certificateGvr).Namespace(namespace).
+	_, err := client.Resource(crd.CertificateGvr).Namespace(namespace).
 		Get(context.TODO(), name, metav1.GetOptions{})
 
 	if err != nil {

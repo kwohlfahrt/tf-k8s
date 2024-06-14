@@ -1,4 +1,4 @@
-package provider
+package crd_test
 
 import (
 	"encoding/json"
@@ -14,15 +14,17 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/statecheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
+	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/provider"
+	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/provider/crd"
 )
 
 func TestAccCertificateResource(t *testing.T) {
-	kubeconfig, err := os.ReadFile("../../examples/k8scrd/kubeconfig.yaml")
+	kubeconfig, err := os.ReadFile("../../../examples/k8scrd/kubeconfig.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	k, err := makeDynamicClient(kubeconfig)
+	k, err := provider.MakeDynamicClient(kubeconfig)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +64,7 @@ func TestAccCertificateResource(t *testing.T) {
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: map[string]func() (tfprotov6.ProviderServer, error){
-			"k8scrd": providerserver.NewProtocol6WithError(New("test")()),
+			"k8scrd": providerserver.NewProtocol6WithError(crd.New("test")()),
 		},
 		Steps: []resource.TestStep{
 			{

@@ -1,4 +1,4 @@
-package provider
+package crd
 
 import (
 	"context"
@@ -81,7 +81,7 @@ func (c *certificateResource) Create(ctx context.Context, req resource.CreateReq
 	// conflict fail if it was created by a different tool, but if we created it
 	// and forgot, this will silently adopt the object. We could generate a
 	// unique `FieldManager` ID per resource, and persist it in the TF state.
-	obj, err := c.client.Resource(certificateGvr).Namespace(metadata.Namespace).
+	obj, err := c.client.Resource(CertificateGvr).Namespace(metadata.Namespace).
 		Apply(ctx, metadata.Name, obj, metav1.ApplyOptions{FieldManager: fieldManager})
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to create resource", err.Error())
@@ -103,7 +103,7 @@ func (c *certificateResource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 
-	obj, err := c.client.Resource(certificateGvr).Namespace(metadata.Namespace).
+	obj, err := c.client.Resource(CertificateGvr).Namespace(metadata.Namespace).
 		Get(ctx, metadata.Name, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsGone(err) || errors.IsNotFound(err) {
@@ -137,7 +137,7 @@ func (c *certificateResource) Update(ctx context.Context, req resource.UpdateReq
 
 	// TODO: Validate that the object already exists. This will silently create
 	// the object if it does not already exist.
-	obj, err := c.client.Resource(certificateGvr).Namespace(metadata.Namespace).
+	obj, err := c.client.Resource(CertificateGvr).Namespace(metadata.Namespace).
 		Apply(ctx, metadata.Name, obj, metav1.ApplyOptions{FieldManager: fieldManager})
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to create resource", err.Error())
@@ -159,7 +159,7 @@ func (c *certificateResource) Delete(ctx context.Context, req resource.DeleteReq
 		return
 	}
 
-	err := c.client.Resource(certificateGvr).Namespace(metadata.Namespace).
+	err := c.client.Resource(CertificateGvr).Namespace(metadata.Namespace).
 		Delete(ctx, metadata.Name, metav1.DeleteOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to delete resource", err.Error())

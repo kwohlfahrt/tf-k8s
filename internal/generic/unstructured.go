@@ -6,6 +6,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
+	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -18,7 +19,7 @@ func StateToObject(ctx context.Context, state tfsdk.Plan) (*unstructured.Unstruc
 	obj["kind"] = "Certificate"
 	obj["apiVersion"] = "cert-manager.io/v1"
 
-	var metaObj KubernetesObjectValue
+	var metaObj types.KubernetesObjectValue
 	diags.Append(state.GetAttribute(ctx, path.Root("metadata"), &metaObj)...)
 	meta, metaDiags := metaObj.ToUnstructured(ctx, path.Root("metadata"))
 	diags.Append(metaDiags...)
@@ -26,7 +27,7 @@ func StateToObject(ctx context.Context, state tfsdk.Plan) (*unstructured.Unstruc
 		obj["metadata"] = meta
 	}
 
-	var specObj KubernetesObjectValue
+	var specObj types.KubernetesObjectValue
 	diags.Append(state.GetAttribute(ctx, path.Root("spec"), &specObj)...)
 	spec, specDiags := specObj.ToUnstructured(ctx, path.Root("spec"))
 	diags.Append(specDiags...)

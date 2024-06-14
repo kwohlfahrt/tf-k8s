@@ -1,4 +1,4 @@
-package generic
+package types
 
 import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -6,7 +6,7 @@ import (
 )
 
 // CRD schemas just define metadata as "object", with no more detail. Hard-code it here.
-var metadataType KubernetesObjectType = KubernetesObjectType{
+var MetadataType KubernetesObjectType = KubernetesObjectType{
 	ObjectType: basetypes.ObjectType{
 		AttrTypes: map[string]attr.Type{
 			"name":      basetypes.StringType{},

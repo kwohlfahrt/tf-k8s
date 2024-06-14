@@ -5,9 +5,9 @@ import (
 	"flag"
 	"log"
 
-	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/provider"
-
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
+
+	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/provider/crd"
 )
 
 var (
@@ -26,7 +26,7 @@ func main() {
 		Debug:   debug,
 	}
 
-	err := providerserver.Serve(context.Background(), provider.New(version), opts)
+	err := providerserver.Serve(context.Background(), crd.New(version), opts)
 	if err != nil {
 		log.Fatal(err.Error())
 	}

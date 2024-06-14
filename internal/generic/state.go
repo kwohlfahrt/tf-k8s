@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -26,7 +27,7 @@ func ObjectToState(ctx context.Context, state tfsdk.State, obj *unstructured.Uns
 			continue
 		}
 
-		kubernetesType, ok := fieldType.(KubernetesType)
+		kubernetesType, ok := fieldType.(types.KubernetesType)
 		if !ok {
 			diags.AddAttributeError(path, "Unexpected schema type", fmt.Sprintf("Expected KubernetesType, got %T", fieldType))
 			continue
