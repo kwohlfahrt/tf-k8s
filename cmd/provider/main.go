@@ -25,8 +25,12 @@ func main() {
 		Address: name,
 		Debug:   debug,
 	}
+	providerFactory, err := crd.New(version)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
 
-	err := providerserver.Serve(context.Background(), crd.New(version), opts)
+	err = providerserver.Serve(context.Background(), providerFactory, opts)
 	if err != nil {
 		log.Fatal(err.Error())
 	}

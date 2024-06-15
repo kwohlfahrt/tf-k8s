@@ -3,39 +3,37 @@ package crd
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
-	"github.com/hashicorp/terraform-plugin-framework/resource"
+	tfresource "github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/generic"
+	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types"
+	"github.com/stoewer/go-strcase"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 )
 
-type certificateResource struct {
-	client *dynamic.DynamicClient
+type crdResource struct {
+	typeInfo generic.TypeInfo
+	client   *dynamic.DynamicClient
 }
 
-func NewCertificateResource() resource.Resource {
-	return &certificateResource{}
+func NewResource(typeInfo generic.TypeInfo) tfresource.Resource {
+	return &crdResource{typeInfo: typeInfo}
 }
 
-func (c *certificateResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_certificate"
+func (c *crdResource) Metadata(ctx context.Context, req tfresource.MetadataRequest, resp *tfresource.MetadataResponse) {
+	groupComponents := strings.Split(c.typeInfo.Group, ".")
+	nameComponents := []string{req.ProviderTypeName, strcase.SnakeCase(c.typeInfo.Kind)}
+
+	nameComponents = append(nameComponents, groupComponents...)
+	resp.TypeName = strings.Join(nameComponents, "_")
 }
 
-func (c *certificateResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
-	crd, err := generic.LoadCrd(schemaBytes, "v1")
-	if err != nil {
-		resp.Diagnostics.AddError("Unable to parse schema file", err.Error())
-		return
-	}
-	if crd == nil {
-		resp.Diagnostics.AddError("CRD version not found", "v1")
-		return
-	}
-
-	result, err := generic.OpenApiToTfSchema(ctx, crd, false)
+func (c *crdResource) Schema(ctx context.Context, req tfresource.SchemaRequest, resp *tfresource.SchemaResponse) {
+	result, err := generic.OpenApiToTfSchema(ctx, c.typeInfo.Schema, false)
 	if err != nil {
 		resp.Diagnostics.AddError("Could not convert CRD to schema", err.Error())
 		return
@@ -44,7 +42,7 @@ func (c *certificateResource) Schema(ctx context.Context, req resource.SchemaReq
 	resp.Schema = *result
 }
 
-func (c *certificateResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (c *crdResource) Configure(ctx context.Context, req tfresource.ConfigureRequest, resp *tfresource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -64,14 +62,14 @@ func (c *certificateResource) Configure(ctx context.Context, req resource.Config
 
 const fieldManager string = "tofu-k8scrd"
 
-func (c *certificateResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var metadata objectMeta
+func (c *crdResource) Create(ctx context.Context, req tfresource.CreateRequest, resp *tfresource.CreateResponse) {
+	var metadata types.ObjectMeta
 	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("metadata"), &metadata)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	obj, diags := generic.StateToObject(ctx, req.Plan)
+	obj, diags := generic.StateToObject(ctx, req.Plan, c.typeInfo)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -81,7 +79,7 @@ func (c *certificateResource) Create(ctx context.Context, req resource.CreateReq
 	// conflict fail if it was created by a different tool, but if we created it
 	// and forgot, this will silently adopt the object. We could generate a
 	// unique `FieldManager` ID per resource, and persist it in the TF state.
-	obj, err := c.client.Resource(CertificateGvr).Namespace(metadata.Namespace).
+	obj, err := c.client.Resource(c.typeInfo.GroupVersionResource()).Namespace(metadata.Namespace).
 		Apply(ctx, metadata.Name, obj, metav1.ApplyOptions{FieldManager: fieldManager})
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to create resource", err.Error())
@@ -96,14 +94,14 @@ func (c *certificateResource) Create(ctx context.Context, req resource.CreateReq
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
 
-func (c *certificateResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var metadata objectMeta
+func (c *crdResource) Read(ctx context.Context, req tfresource.ReadRequest, resp *tfresource.ReadResponse) {
+	var metadata types.ObjectMeta
 	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("metadata"), &metadata)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	obj, err := c.client.Resource(CertificateGvr).Namespace(metadata.Namespace).
+	obj, err := c.client.Resource(c.typeInfo.GroupVersionResource()).Namespace(metadata.Namespace).
 		Get(ctx, metadata.Name, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsGone(err) || errors.IsNotFound(err) {
@@ -122,14 +120,14 @@ func (c *certificateResource) Read(ctx context.Context, req resource.ReadRequest
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
 
-func (c *certificateResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var metadata objectMeta
+func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, resp *tfresource.UpdateResponse) {
+	var metadata types.ObjectMeta
 	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("metadata"), &metadata)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	obj, diags := generic.StateToObject(ctx, req.Plan)
+	obj, diags := generic.StateToObject(ctx, req.Plan, c.typeInfo)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -137,7 +135,7 @@ func (c *certificateResource) Update(ctx context.Context, req resource.UpdateReq
 
 	// TODO: Validate that the object already exists. This will silently create
 	// the object if it does not already exist.
-	obj, err := c.client.Resource(CertificateGvr).Namespace(metadata.Namespace).
+	obj, err := c.client.Resource(c.typeInfo.GroupVersionResource()).Namespace(metadata.Namespace).
 		Apply(ctx, metadata.Name, obj, metav1.ApplyOptions{FieldManager: fieldManager})
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to create resource", err.Error())
@@ -152,14 +150,14 @@ func (c *certificateResource) Update(ctx context.Context, req resource.UpdateReq
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
 
-func (c *certificateResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var metadata objectMeta
+func (c *crdResource) Delete(ctx context.Context, req tfresource.DeleteRequest, resp *tfresource.DeleteResponse) {
+	var metadata types.ObjectMeta
 	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("metadata"), &metadata)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	err := c.client.Resource(CertificateGvr).Namespace(metadata.Namespace).
+	err := c.client.Resource(c.typeInfo.GroupVersionResource()).Namespace(metadata.Namespace).
 		Delete(ctx, metadata.Name, metav1.DeleteOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to delete resource", err.Error())
@@ -168,6 +166,6 @@ func (c *certificateResource) Delete(ctx context.Context, req resource.DeleteReq
 }
 
 var (
-	_ resource.Resource              = &certificateResource{}
-	_ resource.ResourceWithConfigure = &certificateResource{}
+	_ tfresource.Resource              = &crdResource{}
+	_ tfresource.ResourceWithConfigure = &crdResource{}
 )

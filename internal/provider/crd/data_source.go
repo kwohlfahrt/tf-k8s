@@ -3,22 +3,26 @@ package crd
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/stoewer/go-strcase"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/dynamic"
 
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/generic"
+	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type certificateDataSource struct {
-	client *dynamic.DynamicClient
+type crdDataSource struct {
+	typeInfo generic.TypeInfo
+	client   *dynamic.DynamicClient
 }
 
-func (c *certificateDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+func (c *crdDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -36,26 +40,20 @@ func (c *certificateDataSource) Configure(ctx context.Context, req datasource.Co
 	c.client = client
 }
 
-func NewCertificateDataSource() datasource.DataSource {
-	return &certificateDataSource{}
+func NewDataSource(typeInfo generic.TypeInfo) datasource.DataSource {
+	return &crdDataSource{typeInfo: typeInfo}
 }
 
-func (c *certificateDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_certificate"
+func (c *crdDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	groupComponents := strings.Split(c.typeInfo.Group, ".")
+	nameComponents := []string{req.ProviderTypeName, strcase.SnakeCase(c.typeInfo.Kind)}
+
+	nameComponents = append(nameComponents, groupComponents...)
+	resp.TypeName = strings.Join(nameComponents, "_")
 }
 
-func (c *certificateDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
-	crd, err := generic.LoadCrd(schemaBytes, "v1")
-	if err != nil {
-		resp.Diagnostics.AddError("Unable to parse schema file", err.Error())
-		return
-	}
-	if crd == nil {
-		resp.Diagnostics.AddError("CRD version not found", "v1")
-		return
-	}
-
-	result, err := generic.OpenApiToTfSchema(ctx, crd, true)
+func (c *crdDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	result, err := generic.OpenApiToTfSchema(ctx, c.typeInfo.Schema, true)
 	if err != nil {
 		resp.Diagnostics.AddError("Could not convert CRD to schema", err.Error())
 		return
@@ -76,14 +74,14 @@ func (c *certificateDataSource) Schema(ctx context.Context, req datasource.Schem
 	}
 }
 
-func (c *certificateDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var metadata objectMeta
+func (c *crdDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	var metadata types.ObjectMeta
 	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("metadata"), &metadata)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	obj, err := c.client.Resource(CertificateGvr).Namespace(metadata.Namespace).
+	obj, err := c.client.Resource(c.typeInfo.GroupVersionResource()).Namespace(metadata.Namespace).
 		Get(ctx, metadata.Name, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsGone(err) || errors.IsNotFound(err) {
@@ -103,6 +101,6 @@ func (c *certificateDataSource) Read(ctx context.Context, req datasource.ReadReq
 }
 
 var (
-	_ datasource.DataSource              = &certificateDataSource{}
-	_ datasource.DataSourceWithConfigure = &certificateDataSource{}
+	_ datasource.DataSource              = &crdDataSource{}
+	_ datasource.DataSourceWithConfigure = &crdDataSource{}
 )

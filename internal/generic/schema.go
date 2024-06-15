@@ -7,16 +7,53 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	runtimeschema "k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/yaml"
 )
 
-func LoadCrd(bytes []byte, requiredVersion string) (map[string]interface{}, error) {
+type TypeInfo struct {
+	Group    string
+	Resource string
+	Kind     string
+	Schema   map[string]interface{}
+}
+
+func (t TypeInfo) GroupVersionResource() runtimeschema.GroupVersionResource {
+	return runtimeschema.GroupVersionResource{
+		Group:    t.Group,
+		Resource: t.Resource,
+		Version:  "v1",
+	}
+}
+
+func LoadCrd(bytes []byte, requiredVersion string) (*TypeInfo, error) {
 	decoder := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
 	obj := &unstructured.Unstructured{}
 
 	_, _, err := decoder.Decode(bytes, nil, obj)
 	if err != nil {
 		return nil, err
+	}
+
+	group, found, err := unstructured.NestedString(obj.UnstructuredContent(), "spec", "group")
+	if err != nil {
+		return nil, err
+	} else if !found {
+		return nil, fmt.Errorf("field not found: spec.group")
+	}
+
+	kind, found, err := unstructured.NestedString(obj.UnstructuredContent(), "spec", "names", "kind")
+	if err != nil {
+		return nil, err
+	} else if !found {
+		return nil, fmt.Errorf("field not found: spec.names.kind")
+	}
+
+	resource, found, err := unstructured.NestedString(obj.UnstructuredContent(), "spec", "names", "plural")
+	if err != nil {
+		return nil, err
+	} else if !found {
+		return nil, fmt.Errorf("field not found: spec.names.resource")
 	}
 
 	versions, found, err := unstructured.NestedSlice(obj.UnstructuredContent(), "spec", "versions")
@@ -54,7 +91,7 @@ func LoadCrd(bytes []byte, requiredVersion string) (map[string]interface{}, erro
 		if !ok {
 			return nil, fmt.Errorf("expected object, found %t", schemaField)
 		}
-		return schema, nil
+		return &TypeInfo{Group: group, Resource: resource, Kind: kind, Schema: schema}, nil
 	}
 
 	return nil, nil

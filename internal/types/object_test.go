@@ -7,22 +7,20 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/generic"
 )
 
-//go:embed test.crds.yaml
-var schemaBytes []byte
-
 func TestRequiredFields(t *testing.T) {
-	crd, err := generic.LoadCrd(schemaBytes, "v1")
+	typeInfo, err := generic.LoadCrd(internal.SchemaBytes, "v1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if crd == nil {
+	if typeInfo == nil {
 		t.Fatal("CRD version not found: v1")
 	}
 
-	result, err := generic.OpenApiToTfSchema(context.Background(), crd, false)
+	result, err := generic.OpenApiToTfSchema(context.Background(), typeInfo.Schema, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,15 +34,15 @@ func TestRequiredFields(t *testing.T) {
 }
 
 func TestFieldType(t *testing.T) {
-	crd, err := generic.LoadCrd(schemaBytes, "v1")
+	typeInfo, err := generic.LoadCrd(internal.SchemaBytes, "v1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if crd == nil {
+	if typeInfo == nil {
 		t.Fatal("CRD version not found: v1")
 	}
 
-	result, err := generic.OpenApiToTfSchema(context.Background(), crd, false)
+	result, err := generic.OpenApiToTfSchema(context.Background(), typeInfo.Schema, false)
 	if err != nil {
 		t.Fatal(err)
 	}

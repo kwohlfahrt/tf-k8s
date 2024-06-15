@@ -1,6 +1,8 @@
 package types
 
 import (
+	"fmt"
+
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
@@ -15,4 +17,13 @@ var MetadataType KubernetesObjectType = KubernetesObjectType{
 	},
 	fieldNames:     map[string]string{"name": "name", "namespace": "namespace"},
 	requiredFields: map[string]bool{"name": true, "namespace": true},
+}
+
+type ObjectMeta struct {
+	Name      string `tfsdk:"name"`
+	Namespace string `tfsdk:"namespace"`
+}
+
+func (meta ObjectMeta) Id() string {
+	return fmt.Sprintf("%s/%s", meta.Namespace, meta.Name)
 }

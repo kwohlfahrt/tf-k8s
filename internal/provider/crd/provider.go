@@ -2,6 +2,7 @@ package crd
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/function"
@@ -9,11 +10,14 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal"
+	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/generic"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/provider"
 )
 
 type CrdProvider struct {
-	version string
+	version  string
+	typeInfo generic.TypeInfo
 }
 
 type CrdProviderModel struct {
@@ -55,13 +59,13 @@ func (p *CrdProvider) Configure(ctx context.Context, req tfprovider.ConfigureReq
 
 func (p *CrdProvider) DataSources(context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
-		NewCertificateDataSource,
+		func() datasource.DataSource { return NewDataSource(p.typeInfo) },
 	}
 }
 
 func (p *CrdProvider) Resources(context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
-		NewCertificateResource,
+		func() resource.Resource { return NewResource(p.typeInfo) },
 	}
 }
 
@@ -69,10 +73,16 @@ func (p *CrdProvider) Functions(context.Context) []func() function.Function {
 	return []func() function.Function{}
 }
 
-func New(version string) func() tfprovider.Provider {
-	return func() tfprovider.Provider {
-		return &CrdProvider{
-			version: version,
-		}
+func New(version string) (func() tfprovider.Provider, error) {
+	typeInfo, err := generic.LoadCrd(internal.SchemaBytes, "v1")
+	if err != nil {
+		return nil, err
 	}
+	if typeInfo == nil {
+		return nil, fmt.Errorf("CRD version v1 not found")
+	}
+
+	return func() tfprovider.Provider {
+		return &CrdProvider{version: version, typeInfo: *typeInfo}
+	}, nil
 }

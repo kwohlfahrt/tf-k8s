@@ -10,29 +10,23 @@ provider "k8scrd" {
   kubeconfig = file("./kubeconfig.yaml")
 }
 
-data "k8scrd_certificate" "foo" {
+data "k8scrd_foo_example_com" "foo" {
   metadata = {
     name      = "foo"
     namespace = "default"
   }
 }
 
-resource "k8scrd_certificate" "bar" {
+resource "k8scrd_foo_example_com" "bar" {
   metadata = {
     name      = "bar"
     namespace = "default"
   }
   spec = {
-    dns_names = ["bar.example.com"]
-    issuer_ref = {
-      group = "cert-manager.io"
-      kind  = "ClusterIssuer"
-      name  = "production"
-    }
-    secret_name = "bar"
+    foo = "bar"
   }
 }
 
 output "cert_spec" {
-  value = data.k8scrd_certificate.foo.spec
+  value = data.k8scrd_foo_example_com.foo.spec
 }

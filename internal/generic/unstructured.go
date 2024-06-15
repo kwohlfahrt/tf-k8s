@@ -10,14 +10,13 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-func StateToObject(ctx context.Context, state tfsdk.Plan) (*unstructured.Unstructured, diag.Diagnostics) {
+func StateToObject(ctx context.Context, state tfsdk.Plan, typeInfo TypeInfo) (*unstructured.Unstructured, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
 	obj := make(map[string]interface{}, 4)
 
-	// TODO: Don't hard-code this
-	obj["kind"] = "Certificate"
-	obj["apiVersion"] = "cert-manager.io/v1"
+	obj["kind"] = typeInfo.Kind
+	obj["apiVersion"] = typeInfo.GroupVersionResource().GroupVersion().String()
 
 	var metaObj types.KubernetesObjectValue
 	diags.Append(state.GetAttribute(ctx, path.Root("metadata"), &metaObj)...)

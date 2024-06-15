@@ -14,7 +14,7 @@ import (
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/provider/crd"
 )
 
-func TestAccCertificateDataSource(t *testing.T) {
+func TestAccDataSource(t *testing.T) {
 	kubeconfig, err := os.ReadFile("../../../examples/k8scrd/kubeconfig.yaml")
 	if err != nil {
 		t.Fatal(err)
@@ -27,7 +27,7 @@ func TestAccCertificateDataSource(t *testing.T) {
 			},
 		},
 		"data": map[string]interface{}{
-			"k8scrd_certificate": map[string]interface{}{
+			"k8scrd_foo_example_com": map[string]interface{}{
 				"foo": map[string]interface{}{
 					"metadata": map[string]interface{}{
 						"name":      "foo",
@@ -43,18 +43,23 @@ func TestAccCertificateDataSource(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	providerFactory, err := crd.New("test")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: map[string]func() (tfprotov6.ProviderServer, error){
-			"k8scrd": providerserver.NewProtocol6WithError(crd.New("test")()),
+			"k8scrd": providerserver.NewProtocol6WithError(providerFactory()),
 		},
 		Steps: []resource.TestStep{
 			{
 				Config: string(configJson),
 				ConfigStateChecks: []statecheck.StateCheck{
 					statecheck.ExpectKnownValue(
-						"data.k8scrd_certificate.foo",
-						tfjsonpath.New("spec").AtMapKey("dns_names").AtSliceIndex(0),
-						knownvalue.StringExact("foo.example.com"),
+						"data.k8scrd_foo_example_com.foo",
+						tfjsonpath.New("spec").AtMapKey("foo"),
+						knownvalue.StringExact("foo"),
 					),
 				},
 			},

@@ -16,9 +16,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/provider"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/provider/crd"
+	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-func TestAccCertificateResource(t *testing.T) {
+func TestAccResource(t *testing.T) {
 	kubeconfig, err := os.ReadFile("../../../examples/k8scrd/kubeconfig.yaml")
 	if err != nil {
 		t.Fatal(err)
@@ -36,21 +38,14 @@ func TestAccCertificateResource(t *testing.T) {
 			},
 		},
 		"resource": map[string]interface{}{
-			"k8scrd_certificate": map[string]interface{}{
+			"k8scrd_foo_example_com": map[string]interface{}{
 				"bar": map[string]interface{}{
 					"metadata": map[string]interface{}{
 						"name":      "bar",
 						"namespace": "default",
 					},
 					"spec": map[string]interface{}{
-						"dns_names":   []string{"bar.example.com"},
-						"secret_name": "bar",
-						"is_ca":       true,
-						"issuer_ref": map[string]interface{}{
-							"group": "cert-manager.io",
-							"kind":  "ClusterIssuer",
-							"name":  "test",
-						},
+						"foo": "bar",
 					},
 				},
 			},
@@ -62,9 +57,14 @@ func TestAccCertificateResource(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	providerFactory, err := crd.New("test")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: map[string]func() (tfprotov6.ProviderServer, error){
-			"k8scrd": providerserver.NewProtocol6WithError(crd.New("test")()),
+			"k8scrd": providerserver.NewProtocol6WithError(providerFactory()),
 		},
 		Steps: []resource.TestStep{
 			{
@@ -72,36 +72,41 @@ func TestAccCertificateResource(t *testing.T) {
 				ConfigPlanChecks: resource.ConfigPlanChecks{
 					PreApply: []plancheck.PlanCheck{
 						plancheck.ExpectKnownValue(
-							"k8scrd_certificate.bar",
-							tfjsonpath.New("spec").AtMapKey("dns_names").AtSliceIndex(0),
-							knownvalue.StringExact("bar.example.com"),
+							"k8scrd_foo_example_com.bar",
+							tfjsonpath.New("spec").AtMapKey("foo"),
+							knownvalue.StringExact("bar"),
 						),
 					},
 				},
 				ConfigStateChecks: []statecheck.StateCheck{
 					statecheck.ExpectKnownValue(
-						"k8scrd_certificate.bar",
-						tfjsonpath.New("spec").AtMapKey("dns_names").AtSliceIndex(0),
-						knownvalue.StringExact("bar.example.com"),
-					),
-					statecheck.ExpectKnownValue(
-						"k8scrd_certificate.bar",
-						tfjsonpath.New("spec").AtMapKey("is_ca"),
-						knownvalue.Bool(true),
+						"k8scrd_foo_example_com.bar",
+						tfjsonpath.New("spec").AtMapKey("foo"),
+						knownvalue.StringExact("bar"),
 					),
 				},
 				Check: func(s *terraform.State) error {
-					return assertExists(k, "default", "bar", true)
+					return assertExists(
+						k,
+						schema.GroupVersionResource{Group: "example.com", Version: "v1", Resource: "foos"},
+						types.ObjectMeta{Namespace: "default", Name: "bar"},
+						true,
+					)
 				},
 			},
 		},
 		CheckDestroy: func(s *terraform.State) error {
 			for _, resource := range s.RootModule().Resources {
-				if resource.Type != "k8scrd_certificate" {
+				if resource.Type != "k8scrd_foo_example_com" {
 					continue
 				}
 				components := strings.SplitN(resource.Primary.ID, "/", 2)
-				assertExists(k, components[0], components[1], false)
+				return assertExists(
+					k,
+					schema.GroupVersionResource{Group: "example.com", Version: "v1", Resource: "foos"},
+					types.ObjectMeta{Namespace: components[0], Name: components[1]},
+					false,
+				)
 			}
 			return nil
 		},
