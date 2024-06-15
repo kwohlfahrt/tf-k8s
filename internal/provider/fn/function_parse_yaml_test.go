@@ -20,8 +20,10 @@ func TestParseYaml(t *testing.T) {
 	}
 
 	config := map[string]interface{}{
-		"provider": map[string]interface{}{
-			"k8sfn": map[string]interface{}{},
+		"terraform": map[string]interface{}{
+			"required_providers": map[string]interface{}{
+				"k8sfn": map[string]interface{}{},
+			},
 		},
 		"locals": map[string]interface{}{
 			"yaml": string(yaml),
@@ -50,8 +52,30 @@ func TestParseYaml(t *testing.T) {
 						"yaml",
 						knownvalue.ListExact(
 							[]knownvalue.Check{
-								knownvalue.StringExact("one"),
-								knownvalue.StringExact("two"),
+								knownvalue.ObjectPartial(map[string]knownvalue.Check{
+									"api_version": knownvalue.StringExact("cert-manager.io/v1"),
+									"kind":        knownvalue.StringExact("Certificate"),
+									"metadata": knownvalue.ObjectExact(map[string]knownvalue.Check{
+										"name": knownvalue.StringExact("foo"),
+									}),
+									"spec": knownvalue.ObjectPartial(map[string]knownvalue.Check{
+										"dns_names": knownvalue.ListExact([]knownvalue.Check{
+											knownvalue.StringExact("foo.example.com"),
+										}),
+									}),
+								}),
+								knownvalue.ObjectPartial(map[string]knownvalue.Check{
+									"api_version": knownvalue.StringExact("cert-manager.io/v1"),
+									"kind":        knownvalue.StringExact("Certificate"),
+									"metadata": knownvalue.ObjectExact(map[string]knownvalue.Check{
+										"name": knownvalue.StringExact("bar"),
+									}),
+									"spec": knownvalue.ObjectPartial(map[string]knownvalue.Check{
+										"dns_names": knownvalue.ListExact([]knownvalue.Check{
+											knownvalue.StringExact("bar.example.com"),
+										}),
+									}),
+								}),
 							},
 						),
 					),

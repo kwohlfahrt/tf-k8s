@@ -304,5 +304,46 @@ func (v KubernetesObjectValue) ToUnstructured(ctx context.Context, path path.Pat
 	return result, diags
 }
 
+func DynamicObjectFromUnstructured(ctx context.Context, path path.Path, val map[string]interface{}) (basetypes.ObjectValuable, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attrValues := make(map[string]attr.Value, len(val))
+	attrTypes := make(map[string]attr.Type, len(val))
+	fieldNames := make(map[string]string, len(val))
+	for k, v := range val {
+		fieldName := strcase.SnakeCase(k)
+		fieldPath := path.AtName(fieldName)
+		var attrValue attr.Value
+		var attrDiags diag.Diagnostics
+		switch v := v.(type) {
+		case map[string]interface{}:
+			attrValue, attrDiags = DynamicObjectFromUnstructured(ctx, fieldPath, v)
+		case []interface{}:
+			attrValue, attrDiags = dynamicTupleFromUnstructured(ctx, fieldPath, v)
+		default:
+			attrValue, attrDiags = dynamicPrimitiveFromUnstructured(ctx, fieldPath, v)
+		}
+		diags.Append(attrDiags...)
+		if attrDiags.HasError() {
+			continue
+		}
+
+		fieldNames[fieldName] = k
+		attrValues[fieldName] = attrValue
+		attrTypes[fieldName] = attrValue.Type(ctx)
+	}
+	typ := KubernetesObjectType{
+		ObjectType: basetypes.ObjectType{AttrTypes: attrTypes},
+		fieldNames: fieldNames,
+	}
+
+	obj, objDiags := basetypes.NewObjectValue(attrTypes, attrValues)
+	diags.Append(objDiags...)
+
+	kubernetesObj, objDiags := typ.ValueFromObject(ctx, obj)
+	diags.Append(objDiags...)
+	return kubernetesObj, diags
+}
+
 var _ basetypes.ObjectValuable = KubernetesObjectValue{}
 var _ KubernetesValue = KubernetesObjectValue{}

@@ -89,3 +89,50 @@ func newNull(ctx context.Context, typ attr.Type) attr.Value {
 	val, _ := typ.ValueFromTerraform(ctx, tftypes.NewValue(typ.TerraformType(ctx), nil))
 	return val
 }
+
+func dynamicPrimitiveFromUnstructured(ctx context.Context, path path.Path, val interface{}) (attr.Value, diag.Diagnostics) {
+	switch val := val.(type) {
+	case string:
+		return basetypes.NewStringValue(val), nil
+	case int64:
+		return basetypes.NewInt64Value(val), nil
+	case bool:
+		return basetypes.NewBoolValue(val), nil
+	}
+	return nil, diag.Diagnostics{diag.NewAttributeErrorDiagnostic(
+		path, "Unimplemented value type",
+		fmt.Sprintf("Conversion to Kubernetes value is not implemented for %T", val),
+	)}
+}
+
+// Tuples don't have associated schema types, so just treat them as a black-box primitive
+func dynamicTupleFromUnstructured(ctx context.Context, path path.Path, val []interface{}) (basetypes.TupleValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	elemValues := make([]attr.Value, 0, len(val))
+	elemTypes := make([]attr.Type, 0, len(val))
+	for i, v := range val {
+		fieldPath := path.AtTupleIndex(i)
+		var elemValue attr.Value
+		var elemDiags diag.Diagnostics
+		switch v := v.(type) {
+		case map[string]interface{}:
+			elemValue, elemDiags = DynamicObjectFromUnstructured(ctx, fieldPath, v)
+		case []interface{}:
+			elemValue, elemDiags = dynamicTupleFromUnstructured(ctx, fieldPath, v)
+		default:
+			elemValue, elemDiags = dynamicPrimitiveFromUnstructured(ctx, fieldPath, v)
+		}
+		diags.Append(elemDiags...)
+		if elemDiags.HasError() {
+			continue
+		}
+
+		elemValues = append(elemValues, elemValue)
+		elemTypes = append(elemTypes, elemValue.Type(ctx))
+	}
+
+	obj, objDiags := basetypes.NewTupleValue(elemTypes, elemValues)
+	diags.Append(objDiags...)
+	return obj, diags
+}

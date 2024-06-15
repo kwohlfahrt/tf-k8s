@@ -2,10 +2,18 @@ package fn
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"io"
+	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/function"
-	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	generictypes "github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types"
+	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 )
 
 var _ function.Function = &ParseYAMLFunction{}
@@ -31,25 +39,50 @@ func (f *ParseYAMLFunction) Definition(ctx context.Context, req function.Definit
 				Description: "YAML document to parse",
 			},
 		},
-		Return: function.ListReturn{ElementType: types.StringType},
+		Return: function.DynamicReturn{},
 	}
 }
 
 func (f *ParseYAMLFunction) Run(ctx context.Context, req function.RunRequest, resp *function.RunResponse) {
-	var diags diag.Diagnostics
 	var yaml string
 
 	resp.Error = req.Arguments.Get(ctx, &yaml)
 	if resp.Error != nil {
 		return
 	}
+	yamlReader := strings.NewReader(yaml)
+	decoder := utilyaml.NewYAMLOrJSONDecoder(yamlReader, 4096)
 
-	result := []string{"one", "two"}
+	var diags diag.Diagnostics
+	data := []attr.Value{}
+	types := []attr.Type{}
+	for {
+		item := map[string]interface{}{}
+		err := decoder.Decode(&item)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			resp.Error = function.NewArgumentFuncError(0, fmt.Sprintf("Unable to decode input YAML: %s", err.Error()))
+			return
+		}
+		obj, itemDiags := generictypes.DynamicObjectFromUnstructured(ctx, path.Empty(), item)
+		diags.Append(itemDiags...)
+		if itemDiags.HasError() {
+			continue
+		}
+
+		data = append(data, obj)
+		types = append(types, obj.Type(ctx))
+	}
+
+	tfData, tfDiags := basetypes.NewTupleValue(types, data)
+	diags.Append(tfDiags...)
 
 	resp.Error = function.FuncErrorFromDiags(ctx, diags)
 	if resp.Error != nil {
 		return
 	}
 
-	resp.Error = resp.Result.Set(ctx, result)
+	resp.Error = resp.Result.Set(ctx, basetypes.NewDynamicValue(tfData))
 }

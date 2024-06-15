@@ -10,3 +10,16 @@ spec:
     kind: ClusterIssuer
     name: production
   secretName: foo
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: bar
+spec:
+  dnsNames:
+  - bar.example.com
+  issuerRef:
+    group: cert-manager.io
+    kind: ClusterIssuer
+    name: production
+  secretName: bar
