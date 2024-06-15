@@ -56,7 +56,10 @@ func (f *ParseYAMLFunction) Run(ctx context.Context, req function.RunRequest, re
 	var diags diag.Diagnostics
 	data := []attr.Value{}
 	types := []attr.Type{}
-	for {
+
+document:
+	for i := 0; ; i += 1 {
+		itemPath := path.Empty().AtListIndex(i)
 		item := map[string]interface{}{}
 		err := decoder.Decode(&item)
 		if err != nil {
@@ -66,7 +69,17 @@ func (f *ParseYAMLFunction) Run(ctx context.Context, req function.RunRequest, re
 			resp.Error = function.NewArgumentFuncError(0, fmt.Sprintf("Unable to decode input YAML: %s", err.Error()))
 			return
 		}
-		obj, itemDiags := generictypes.DynamicObjectFromUnstructured(ctx, path.Empty(), item)
+		for _, k := range []string{"apiVersion", "kind", "metadata"} {
+			if _, found := item[k]; !found {
+				diags.Append(diag.NewAttributeErrorDiagnostic(
+					itemPath, "Missing required field",
+					fmt.Sprintf("Item does not define the property %s", k),
+				))
+				continue document
+			}
+		}
+
+		obj, itemDiags := generictypes.DynamicObjectFromUnstructured(ctx, itemPath, item)
 		diags.Append(itemDiags...)
 		if itemDiags.HasError() {
 			continue
