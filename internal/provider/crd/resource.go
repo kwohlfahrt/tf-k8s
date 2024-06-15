@@ -29,6 +29,7 @@ func (c *crdResource) Metadata(ctx context.Context, req tfresource.MetadataReque
 	nameComponents := []string{req.ProviderTypeName, strcase.SnakeCase(c.typeInfo.Kind)}
 
 	nameComponents = append(nameComponents, groupComponents...)
+	nameComponents = append(nameComponents, c.typeInfo.Version)
 	resp.TypeName = strings.Join(nameComponents, "_")
 }
 

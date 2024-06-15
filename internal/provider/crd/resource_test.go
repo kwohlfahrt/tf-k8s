@@ -38,7 +38,7 @@ func TestAccResource(t *testing.T) {
 			},
 		},
 		"resource": map[string]interface{}{
-			"k8scrd_foo_example_com": map[string]interface{}{
+			"k8scrd_foo_example_com_v1": map[string]interface{}{
 				"bar": map[string]interface{}{
 					"metadata": map[string]interface{}{
 						"name":      "bar",
@@ -72,7 +72,7 @@ func TestAccResource(t *testing.T) {
 				ConfigPlanChecks: resource.ConfigPlanChecks{
 					PreApply: []plancheck.PlanCheck{
 						plancheck.ExpectKnownValue(
-							"k8scrd_foo_example_com.bar",
+							"k8scrd_foo_example_com_v1.bar",
 							tfjsonpath.New("spec").AtMapKey("foo"),
 							knownvalue.StringExact("bar"),
 						),
@@ -80,7 +80,7 @@ func TestAccResource(t *testing.T) {
 				},
 				ConfigStateChecks: []statecheck.StateCheck{
 					statecheck.ExpectKnownValue(
-						"k8scrd_foo_example_com.bar",
+						"k8scrd_foo_example_com_v1.bar",
 						tfjsonpath.New("spec").AtMapKey("foo"),
 						knownvalue.StringExact("bar"),
 					),
@@ -97,7 +97,7 @@ func TestAccResource(t *testing.T) {
 		},
 		CheckDestroy: func(s *terraform.State) error {
 			for _, resource := range s.RootModule().Resources {
-				if resource.Type != "k8scrd_foo_example_com" {
+				if resource.Type != "k8scrd_foo_example_com_v1" {
 					continue
 				}
 				components := strings.SplitN(resource.Primary.ID, "/", 2)

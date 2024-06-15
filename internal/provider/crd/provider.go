@@ -2,7 +2,6 @@ package crd
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/function"
@@ -16,8 +15,8 @@ import (
 )
 
 type CrdProvider struct {
-	version  string
-	typeInfo generic.TypeInfo
+	version   string
+	typeInfos map[string]generic.TypeInfo
 }
 
 type CrdProviderModel struct {
@@ -58,15 +57,19 @@ func (p *CrdProvider) Configure(ctx context.Context, req tfprovider.ConfigureReq
 }
 
 func (p *CrdProvider) DataSources(context.Context) []func() datasource.DataSource {
-	return []func() datasource.DataSource{
-		func() datasource.DataSource { return NewDataSource(p.typeInfo) },
+	result := make([]func() datasource.DataSource, 0, len(p.typeInfos))
+	for _, typeInfo := range p.typeInfos {
+		result = append(result, func() datasource.DataSource { return NewDataSource(typeInfo) })
 	}
+	return result
 }
 
 func (p *CrdProvider) Resources(context.Context) []func() resource.Resource {
-	return []func() resource.Resource{
-		func() resource.Resource { return NewResource(p.typeInfo) },
+	result := make([]func() resource.Resource, 0, len(p.typeInfos))
+	for _, typeInfo := range p.typeInfos {
+		result = append(result, func() resource.Resource { return NewResource(typeInfo) })
 	}
+	return result
 }
 
 func (p *CrdProvider) Functions(context.Context) []func() function.Function {
@@ -74,15 +77,12 @@ func (p *CrdProvider) Functions(context.Context) []func() function.Function {
 }
 
 func New(version string) (func() tfprovider.Provider, error) {
-	typeInfo, err := generic.LoadCrd(internal.SchemaBytes, "v1")
+	typeInfos, err := generic.LoadCrd(internal.SchemaBytes)
 	if err != nil {
 		return nil, err
 	}
-	if typeInfo == nil {
-		return nil, fmt.Errorf("CRD version v1 not found")
-	}
 
 	return func() tfprovider.Provider {
-		return &CrdProvider{version: version, typeInfo: *typeInfo}
+		return &CrdProvider{version: version, typeInfos: typeInfos}
 	}, nil
 }

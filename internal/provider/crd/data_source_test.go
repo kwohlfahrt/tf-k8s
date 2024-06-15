@@ -27,7 +27,7 @@ func TestAccDataSource(t *testing.T) {
 			},
 		},
 		"data": map[string]interface{}{
-			"k8scrd_foo_example_com": map[string]interface{}{
+			"k8scrd_foo_example_com_v1": map[string]interface{}{
 				"foo": map[string]interface{}{
 					"metadata": map[string]interface{}{
 						"name":      "foo",
@@ -57,7 +57,7 @@ func TestAccDataSource(t *testing.T) {
 				Config: string(configJson),
 				ConfigStateChecks: []statecheck.StateCheck{
 					statecheck.ExpectKnownValue(
-						"data.k8scrd_foo_example_com.foo",
+						"data.k8scrd_foo_example_com_v1.foo",
 						tfjsonpath.New("spec").AtMapKey("foo"),
 						knownvalue.StringExact("foo"),
 					),

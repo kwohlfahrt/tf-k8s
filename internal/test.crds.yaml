@@ -28,3 +28,19 @@ spec:
             required: [foo]
             properties: { foo: { type: string }, bar: { type: string } }
           status: { type: object, properties: {} }
+  - name: v2
+    subresources: { status: {} }
+    served: true
+    storage: false
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          apiVersion: { type: string }
+          kind: { type: string }
+          metadata: { type: object }
+          spec:
+            type: object
+            required: [foo]
+            properties: { foo: { type: string }, bar: { type: string } }
+          status: { type: object, properties: {} }

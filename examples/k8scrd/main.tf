@@ -10,14 +10,14 @@ provider "k8scrd" {
   kubeconfig = file("./kubeconfig.yaml")
 }
 
-data "k8scrd_foo_example_com" "foo" {
+data "k8scrd_foo_example_com_v1" "foo" {
   metadata = {
     name      = "foo"
     namespace = "default"
   }
 }
 
-resource "k8scrd_foo_example_com" "bar" {
+resource "k8scrd_foo_example_com_v1" "bar" {
   metadata = {
     name      = "bar"
     namespace = "default"
@@ -28,5 +28,5 @@ resource "k8scrd_foo_example_com" "bar" {
 }
 
 output "cert_spec" {
-  value = data.k8scrd_foo_example_com.foo.spec
+  value = data.k8scrd_foo_example_com_v1.foo.spec
 }

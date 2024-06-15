@@ -15,6 +15,7 @@ type TypeInfo struct {
 	Group    string
 	Resource string
 	Kind     string
+	Version  string
 	Schema   map[string]interface{}
 }
 
@@ -22,11 +23,11 @@ func (t TypeInfo) GroupVersionResource() runtimeschema.GroupVersionResource {
 	return runtimeschema.GroupVersionResource{
 		Group:    t.Group,
 		Resource: t.Resource,
-		Version:  "v1",
+		Version:  t.Version,
 	}
 }
 
-func LoadCrd(bytes []byte, requiredVersion string) (*TypeInfo, error) {
+func LoadCrd(bytes []byte) (map[string]TypeInfo, error) {
 	decoder := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
 	obj := &unstructured.Unstructured{}
 
@@ -63,6 +64,7 @@ func LoadCrd(bytes []byte, requiredVersion string) (*TypeInfo, error) {
 		return nil, fmt.Errorf("field not found: spec.versions")
 	}
 
+	typeInfos := make(map[string]TypeInfo, len(versions))
 	for _, version := range versions {
 		versionObj, ok := version.(map[string]interface{})
 		if !ok {
@@ -76,10 +78,6 @@ func LoadCrd(bytes []byte, requiredVersion string) (*TypeInfo, error) {
 			return nil, fmt.Errorf("field not found: spec.versions[*].name")
 		}
 
-		if versionName != requiredVersion {
-			continue
-		}
-
 		schemaField, found, err := unstructured.NestedFieldNoCopy(versionObj, "schema", "openAPIV3Schema")
 		if err != nil {
 			return nil, err
@@ -91,10 +89,16 @@ func LoadCrd(bytes []byte, requiredVersion string) (*TypeInfo, error) {
 		if !ok {
 			return nil, fmt.Errorf("expected object, found %t", schemaField)
 		}
-		return &TypeInfo{Group: group, Resource: resource, Kind: kind, Schema: schema}, nil
+		typeInfos[versionName] = TypeInfo{
+			Group:    group,
+			Version:  versionName,
+			Resource: resource,
+			Kind:     kind,
+			Schema:   schema,
+		}
 	}
 
-	return nil, nil
+	return typeInfos, nil
 }
 
 func OpenApiToTfSchema(ctx context.Context, openapi map[string]interface{}, datasource bool) (*schema.Schema, error) {
