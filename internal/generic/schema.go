@@ -11,6 +11,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/yaml"
 )
 
+type Version string
+
 type TypeInfo struct {
 	Group    string
 	Resource string
@@ -27,7 +29,7 @@ func (t TypeInfo) GroupVersionResource() runtimeschema.GroupVersionResource {
 	}
 }
 
-func LoadCrd(bytes []byte) (map[string]TypeInfo, error) {
+func LoadCrd(bytes []byte) (map[Version]TypeInfo, error) {
 	decoder := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
 	obj := &unstructured.Unstructured{}
 
@@ -64,7 +66,7 @@ func LoadCrd(bytes []byte) (map[string]TypeInfo, error) {
 		return nil, fmt.Errorf("field not found: spec.versions")
 	}
 
-	typeInfos := make(map[string]TypeInfo, len(versions))
+	typeInfos := make(map[Version]TypeInfo, len(versions))
 	for _, version := range versions {
 		versionObj, ok := version.(map[string]interface{})
 		if !ok {
@@ -89,7 +91,7 @@ func LoadCrd(bytes []byte) (map[string]TypeInfo, error) {
 		if !ok {
 			return nil, fmt.Errorf("expected object, found %t", schemaField)
 		}
-		typeInfos[versionName] = TypeInfo{
+		typeInfos[Version(versionName)] = TypeInfo{
 			Group:    group,
 			Version:  versionName,
 			Resource: resource,

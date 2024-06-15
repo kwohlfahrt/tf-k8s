@@ -16,7 +16,7 @@ import (
 
 type CrdProvider struct {
 	version   string
-	typeInfos map[string]generic.TypeInfo
+	typeInfos map[generic.Version]generic.TypeInfo
 }
 
 type CrdProviderModel struct {
