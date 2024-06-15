@@ -1,17 +1,22 @@
 package generic
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	runtimeschema "k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer/yaml"
+
+	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 )
 
 type Version string
+type CrdName string
 
 type TypeInfo struct {
 	Group    string
@@ -29,15 +34,39 @@ func (t TypeInfo) GroupVersionResource() runtimeschema.GroupVersionResource {
 	}
 }
 
-func LoadCrd(bytes []byte) (map[Version]TypeInfo, error) {
-	decoder := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
-	obj := &unstructured.Unstructured{}
+func LoadCrds(yaml []byte) (map[CrdName]map[Version]TypeInfo, error) {
+	yamlReader := bytes.NewReader(yaml)
+	decoder := utilyaml.NewYAMLOrJSONDecoder(yamlReader, 4096)
 
-	_, _, err := decoder.Decode(bytes, nil, obj)
-	if err != nil {
-		return nil, err
+	result := map[CrdName]map[Version]TypeInfo{}
+	for i := 0; ; i += 1 {
+		obj := &unstructured.Unstructured{}
+		err := decoder.Decode(&obj)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return nil, err
+		}
+
+		crdName, found, err := unstructured.NestedString(obj.UnstructuredContent(), "metadata", "name")
+		if err != nil {
+			return nil, err
+		}
+		if !found {
+			return nil, fmt.Errorf("field not found: metadata.name")
+		}
+
+		crd, err := loadCrd(*obj)
+		if err != nil {
+			return nil, err
+		}
+		result[CrdName(crdName)] = crd
 	}
+	return result, nil
+}
 
+func loadCrd(obj unstructured.Unstructured) (map[Version]TypeInfo, error) {
 	group, found, err := unstructured.NestedString(obj.UnstructuredContent(), "spec", "group")
 	if err != nil {
 		return nil, err

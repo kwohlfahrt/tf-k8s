@@ -12,11 +12,11 @@ import (
 )
 
 func TestRequiredFields(t *testing.T) {
-	typeInfos, err := generic.LoadCrd(internal.SchemaBytes)
+	typeInfos, err := generic.LoadCrds(internal.SchemaBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
-	typeInfo, found := typeInfos["v1"]
+	typeInfo, found := typeInfos["foos.example.com"]["v1"]
 	if !found {
 		t.Fatal("CRD version not found: v1")
 	}
@@ -35,11 +35,11 @@ func TestRequiredFields(t *testing.T) {
 }
 
 func TestFieldType(t *testing.T) {
-	typeInfos, err := generic.LoadCrd(internal.SchemaBytes)
+	typeInfos, err := generic.LoadCrds(internal.SchemaBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
-	typeInfo, found := typeInfos["v1"]
+	typeInfo, found := typeInfos["foos.example.com"]["v1"]
 	if !found {
 		t.Fatal("CRD version not found: v1")
 	}

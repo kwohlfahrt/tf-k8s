@@ -27,6 +27,16 @@ resource "k8scrd_foo_example_com_v1" "bar" {
   }
 }
 
+resource "k8scrd_bar_example_com_v1" "bar" {
+  metadata = {
+    name      = "bar"
+    namespace = "default"
+  }
+  spec = {
+    bar = "bar"
+  }
+}
+
 output "cert_spec" {
   value = data.k8scrd_foo_example_com_v1.foo.spec
 }

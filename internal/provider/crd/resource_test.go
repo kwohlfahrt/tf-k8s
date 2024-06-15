@@ -3,7 +3,6 @@ package crd_test
 import (
 	"encoding/json"
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
@@ -12,7 +11,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/statecheck"
-	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/provider"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/provider/crd"
@@ -49,6 +47,17 @@ func TestAccResource(t *testing.T) {
 					},
 				},
 			},
+			"k8scrd_bar_example_com_v1": map[string]interface{}{
+				"bar": map[string]interface{}{
+					"metadata": map[string]interface{}{
+						"name":      "bar",
+						"namespace": "default",
+					},
+					"spec": map[string]interface{}{
+						"bar": "bar",
+					},
+				},
+			},
 		},
 	}
 
@@ -76,6 +85,11 @@ func TestAccResource(t *testing.T) {
 							tfjsonpath.New("spec").AtMapKey("foo"),
 							knownvalue.StringExact("bar"),
 						),
+						plancheck.ExpectKnownValue(
+							"k8scrd_bar_example_com_v1.bar",
+							tfjsonpath.New("spec").AtMapKey("bar"),
+							knownvalue.StringExact("bar"),
+						),
 					},
 				},
 				ConfigStateChecks: []statecheck.StateCheck{
@@ -84,31 +98,41 @@ func TestAccResource(t *testing.T) {
 						tfjsonpath.New("spec").AtMapKey("foo"),
 						knownvalue.StringExact("bar"),
 					),
+					statecheck.ExpectKnownValue(
+						"k8scrd_bar_example_com_v1.bar",
+						tfjsonpath.New("spec").AtMapKey("bar"),
+						knownvalue.StringExact("bar"),
+					),
 				},
-				Check: func(s *terraform.State) error {
-					return assertExists(
+				Check: resource.ComposeTestCheckFunc(
+					checkExists(
 						k,
 						schema.GroupVersionResource{Group: "example.com", Version: "v1", Resource: "foos"},
 						types.ObjectMeta{Namespace: "default", Name: "bar"},
 						true,
-					)
-				},
+					),
+					checkExists(
+						k,
+						schema.GroupVersionResource{Group: "example.com", Version: "v1", Resource: "bars"},
+						types.ObjectMeta{Namespace: "default", Name: "bar"},
+						true,
+					),
+				),
 			},
 		},
-		CheckDestroy: func(s *terraform.State) error {
-			for _, resource := range s.RootModule().Resources {
-				if resource.Type != "k8scrd_foo_example_com_v1" {
-					continue
-				}
-				components := strings.SplitN(resource.Primary.ID, "/", 2)
-				return assertExists(
-					k,
-					schema.GroupVersionResource{Group: "example.com", Version: "v1", Resource: "foos"},
-					types.ObjectMeta{Namespace: components[0], Name: components[1]},
-					false,
-				)
-			}
-			return nil
-		},
+		CheckDestroy: resource.ComposeTestCheckFunc(
+			checkExists(
+				k,
+				schema.GroupVersionResource{Group: "example.com", Version: "v1", Resource: "foos"},
+				types.ObjectMeta{Namespace: "default", Name: "bar"},
+				false,
+			),
+			checkExists(
+				k,
+				schema.GroupVersionResource{Group: "example.com", Version: "v1", Resource: "bars"},
+				types.ObjectMeta{Namespace: "default", Name: "bar"},
+				false,
+			),
+		),
 	})
 }
