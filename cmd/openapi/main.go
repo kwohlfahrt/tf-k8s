@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/provider"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types"
@@ -44,5 +45,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err.Error())
 	}
-	fmt.Printf("%+v", typ)
+
+	var builder strings.Builder
+	typ.Codegen(&builder)
+	fmt.Printf("%s\n", builder.String())
 }

@@ -128,6 +128,19 @@ func (t KubernetesListType) SchemaType(ctx context.Context, isDatasource bool, i
 	}
 }
 
+func (t KubernetesListType) Codegen(builder *strings.Builder) {
+	builder.WriteString("types.KubernetesListType{")
+	builder.WriteString("ListType: basetypes.ListType{")
+	builder.WriteString("ElemType: ")
+	if kubernetesElem, ok := t.ListType.ElemType.(KubernetesType); ok {
+		kubernetesElem.Codegen(builder)
+	} else {
+		primitiveCodegen(t.ListType.ElemType, builder)
+	}
+	builder.WriteString("},")
+	builder.WriteString("}")
+}
+
 func ListFromOpenApi(openapi spec.Schema, path []string) (KubernetesType, error) {
 	items := openapi.Items.Schema
 	if items == nil {

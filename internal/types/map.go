@@ -128,6 +128,19 @@ func (t KubernetesMapType) SchemaType(ctx context.Context, isDatasource bool, is
 	}
 }
 
+func (t KubernetesMapType) Codegen(builder *strings.Builder) {
+	builder.WriteString("types.KubernetesMapType{")
+	builder.WriteString("MapType: basetypes.MapType{")
+	builder.WriteString("ElemType: ")
+	if kubernetesElem, ok := t.MapType.ElemType.(KubernetesType); ok {
+		kubernetesElem.Codegen(builder)
+	} else {
+		primitiveCodegen(t.MapType.ElemType, builder)
+	}
+	builder.WriteString("},")
+	builder.WriteString("}")
+}
+
 func MapFromOpenApi(openapi spec.Schema, path []string) (KubernetesType, error) {
 	items := openapi.AdditionalProperties.Schema
 	if items == nil {

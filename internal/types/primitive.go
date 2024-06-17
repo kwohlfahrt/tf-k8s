@@ -3,6 +3,7 @@ package types
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -135,4 +136,19 @@ func dynamicTupleFromUnstructured(ctx context.Context, path path.Path, val []int
 	obj, objDiags := basetypes.NewTupleValue(elemTypes, elemValues)
 	diags.Append(objDiags...)
 	return obj, diags
+}
+
+func primitiveCodegen(attr interface{}, builder *strings.Builder) error {
+	var err error
+	switch attr := attr.(type) {
+	case basetypes.StringType:
+		_, err = builder.WriteString("basetypes.StringType{}")
+	case basetypes.Int64Type:
+		_, err = builder.WriteString("basetypes.Int64Type{}")
+	case basetypes.BoolType:
+		_, err = builder.WriteString("basetypes.BoolType{}")
+	default:
+		err = fmt.Errorf("no codegen for type %T", attr)
+	}
+	return err
 }
