@@ -11,6 +11,7 @@ import (
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	runtimeschema "k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 )
@@ -132,19 +133,15 @@ func loadCrd(obj unstructured.Unstructured) (map[Version]TypeInfo, error) {
 	return typeInfos, nil
 }
 
-func OpenApiToTfSchema(ctx context.Context, openapi map[string]interface{}, datasource bool) (*schema.Schema, error) {
-	if ty := openapi["type"]; ty != "object" {
-		return nil, fmt.Errorf("expected object, got type: %s", ty)
-	}
-
-	properties, ok := openapi["properties"].(map[string]interface{})
-	if !ok {
+func OpenApiToTfSchema(ctx context.Context, openapi *spec.Schema, datasource bool) (*schema.Schema, error) {
+	properties := openapi.Properties
+	if properties == nil {
 		return nil, fmt.Errorf("object has no properties")
 	}
 
-	specProperties, ok := properties["spec"].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("object spec has invalid properties")
+	specProperties, found := properties["spec"]
+	if !found {
+		return nil, fmt.Errorf("object doesn't include spec")
 	}
 
 	customType, err := types.ObjectFromOpenApi(specProperties, []string{"spec"})

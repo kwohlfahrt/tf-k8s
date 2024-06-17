@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 type KubernetesListType struct {
@@ -127,13 +128,13 @@ func (t KubernetesListType) SchemaType(ctx context.Context, isDatasource bool, i
 	}
 }
 
-func ListFromOpenApi(openapi map[string]interface{}, path []string) (KubernetesType, error) {
-	items, ok := openapi["items"].(map[string]interface{})
-	if !ok {
+func ListFromOpenApi(openapi spec.Schema, path []string) (KubernetesType, error) {
+	items := openapi.Items.Schema
+	if items == nil {
 		return nil, fmt.Errorf("expected map of items at %s", strings.Join(path, ""))
 	}
 
-	elemType, err := openApiToTfType(items, append(path, "[*]"))
+	elemType, err := openApiToTfType(*items, append(path, "[*]"))
 	if err != nil {
 		return nil, err
 	}

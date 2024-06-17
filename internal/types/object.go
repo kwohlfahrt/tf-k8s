@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	strcase "github.com/stoewer/go-strcase"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 type KubernetesType interface {
@@ -166,21 +167,16 @@ func (t KubernetesObjectType) SchemaType(ctx context.Context, isDatasource bool,
 	}, nil
 }
 
-func ObjectFromOpenApi(openapi map[string]interface{}, path []string) (KubernetesType, error) {
-	properties, ok := openapi["properties"].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("expected map of properties at %s", strings.Join(path, ""))
+func ObjectFromOpenApi(openapi spec.Schema, path []string) (KubernetesType, error) {
+	properties := openapi.Properties
+	if properties == nil {
+		return nil, fmt.Errorf("expected properties at %s", strings.Join(path, ""))
 	}
 
 	attrTypes := make(map[string]attr.Type, len(properties))
 	fieldNames := make(map[string]string, len(properties))
-	for k, v := range properties {
+	for k, property := range properties {
 		attrPath := append(path, fmt.Sprintf(".%s", k))
-		property, ok := v.(map[string]interface{})
-		if !ok {
-			return nil, fmt.Errorf("expected object at %s", strings.Join(attrPath, ""))
-		}
-
 		attribute, err := openApiToTfType(property, attrPath)
 		if err != nil {
 			return nil, err
@@ -190,21 +186,9 @@ func ObjectFromOpenApi(openapi map[string]interface{}, path []string) (Kubernete
 		fieldNames[fieldName] = k
 	}
 
-	rawRequired, found := openapi["required"]
-	if !found {
-		rawRequired = []interface{}{}
-	}
-	required, ok := rawRequired.([]interface{})
-	if !ok {
-		return nil, fmt.Errorf("expected list of required fields at %s", strings.Join(path, ""))
-	}
+	required := openapi.Required
 	requiredFields := make(map[string]bool, len(required))
-	for i, field := range required {
-		fieldName, ok := field.(string)
-		if !ok {
-			indexPath := append(path, fmt.Sprintf("[%d]", i))
-			return nil, fmt.Errorf("expected name of required fields at %s", strings.Join(indexPath, ""))
-		}
+	for _, fieldName := range required {
 		requiredFields[strcase.SnakeCase(fieldName)] = true
 	}
 
@@ -215,10 +199,14 @@ func ObjectFromOpenApi(openapi map[string]interface{}, path []string) (Kubernete
 	}, nil
 }
 
-func openApiToTfType(openapi map[string]interface{}, path []string) (attr.Type, error) {
-	switch ty := openapi["type"]; ty {
+func openApiToTfType(openapi spec.Schema, path []string) (attr.Type, error) {
+	if len(openapi.Type) != 1 {
+		return nil, fmt.Errorf("expected exactly one type at %s", strings.Join(path, ""))
+	}
+
+	switch ty := openapi.Type[0]; ty {
 	case "object":
-		if _, isMap := openapi["additionalProperties"]; isMap {
+		if openapi.AdditionalProperties != nil {
 			return MapFromOpenApi(openapi, path)
 		} else {
 			return ObjectFromOpenApi(openapi, path)
