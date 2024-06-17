@@ -15,8 +15,8 @@ var MetadataType KubernetesObjectType = KubernetesObjectType{
 			"namespace": basetypes.StringType{},
 		},
 	},
-	fieldNames:     map[string]string{"name": "name", "namespace": "namespace"},
-	requiredFields: map[string]bool{"name": true, "namespace": true},
+	FieldNames:     map[string]string{"name": "name", "namespace": "namespace"},
+	RequiredFields: map[string]bool{"name": true, "namespace": true},
 }
 
 type ObjectMeta struct {

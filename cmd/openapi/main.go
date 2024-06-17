@@ -47,6 +47,13 @@ func main() {
 	}
 
 	var builder strings.Builder
+	builder.WriteString("package internal\n\n")
+	builder.WriteString("import (\n")
+	builder.WriteString("\t\"github.com/hashicorp/terraform-plugin-framework/attr\"\n")
+	builder.WriteString("\t\"github.com/hashicorp/terraform-plugin-framework/types/basetypes\"\n")
+	builder.WriteString("\t\"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types\"\n")
+	builder.WriteString(")\n\nvar CrdType = ")
+
 	typ.Codegen(&builder)
-	fmt.Printf("%s\n", builder.String())
+	fmt.Println(builder.String())
 }
