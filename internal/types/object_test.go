@@ -3,6 +3,7 @@ package types_test
 import (
 	"context"
 	_ "embed"
+	"slices"
 
 	"testing"
 
@@ -12,14 +13,13 @@ import (
 )
 
 func TestRequiredFields(t *testing.T) {
-	typeInfos, err := generic.LoadCrds(internal.SchemaBytes)
-	if err != nil {
-		t.Fatal(err)
+	infoIdx := slices.IndexFunc(internal.TypeInfos, func(typeInfo generic.TypeInfo) bool {
+		return typeInfo.Group == "example.com" && typeInfo.Resource == "foos" && typeInfo.Version == "v1"
+	})
+	if infoIdx == -1 {
+		t.Fatal("CRD version not found: foos.example.com/v1")
 	}
-	typeInfo, found := typeInfos["foos.example.com"]["v1"]
-	if !found {
-		t.Fatal("CRD version not found: v1")
-	}
+	typeInfo := internal.TypeInfos[infoIdx]
 
 	result, err := generic.OpenApiToTfSchema(context.Background(), typeInfo.Schema, false)
 	if err != nil {
@@ -35,14 +35,13 @@ func TestRequiredFields(t *testing.T) {
 }
 
 func TestFieldType(t *testing.T) {
-	typeInfos, err := generic.LoadCrds(internal.SchemaBytes)
-	if err != nil {
-		t.Fatal(err)
+	infoIdx := slices.IndexFunc(internal.TypeInfos, func(typeInfo generic.TypeInfo) bool {
+		return typeInfo.Group == "example.com" && typeInfo.Resource == "foos" && typeInfo.Version == "v1"
+	})
+	if infoIdx == -1 {
+		t.Fatal("CRD version not found: foos.example.com/v1")
 	}
-	typeInfo, found := typeInfos["foos.example.com"]["v1"]
-	if !found {
-		t.Fatal("CRD version not found: v1")
-	}
+	typeInfo := internal.TypeInfos[infoIdx]
 
 	result, err := generic.OpenApiToTfSchema(context.Background(), typeInfo.Schema, false)
 	if err != nil {

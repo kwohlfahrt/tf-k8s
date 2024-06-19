@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"slices"
 	"strings"
 
+	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/generic"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/provider"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types"
 	runtimeschema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -21,29 +23,11 @@ func main() {
 	if err != nil {
 		log.Fatal(err.Error())
 	}
+	root := openapi3.NewRoot(discoveryClient.OpenAPIV3())
 
-	client := discoveryClient.OpenAPIV3()
-	root := openapi3.NewRoot(client)
-	_, err = root.GroupVersions()
+	_, resourceLists, err := discoveryClient.ServerGroupsAndResources()
 	if err != nil {
-		log.Fatal(err.Error())
-	}
-
-	gv := runtimeschema.GroupVersion{Group: "example.com", Version: "v1"}
-	openApiSpec, err := root.GVSpec(gv)
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-
-	schema := openApiSpec.Components.Schemas["com.example.v1.Foo"]
-	spec, found := schema.Properties["spec"]
-	if !found {
-		log.Fatal(fmt.Errorf("no CRD spec found"))
-	}
-
-	typ, err := types.ObjectFromOpenApi(spec, []string{})
-	if err != nil {
-		log.Fatal(err.Error())
+		log.Fatal(err)
 	}
 
 	var builder strings.Builder
@@ -52,8 +36,62 @@ func main() {
 	builder.WriteString("\t\"github.com/hashicorp/terraform-plugin-framework/attr\"\n")
 	builder.WriteString("\t\"github.com/hashicorp/terraform-plugin-framework/types/basetypes\"\n")
 	builder.WriteString("\t\"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types\"\n")
-	builder.WriteString(")\n\nvar CrdType = ")
+	builder.WriteString("\t\"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/generic\"\n")
+	builder.WriteString(")\n\nvar TypeInfos = []generic.TypeInfo{")
+	for _, resourceList := range resourceLists {
+		gv, err := runtimeschema.ParseGroupVersion(resourceList.GroupVersion)
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+		if gv.Group != "example.com" {
+			continue
+		}
+		groupComponents := strings.Split(gv.Group, ".")
+		slices.Reverse(groupComponents)
+		reverseGroup := strings.Join(groupComponents, ".")
 
-	typ.Codegen(&builder)
+		openApiSpec, err := root.GVSpec(gv)
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+
+		for _, resource := range resourceList.APIResources {
+			if strings.Contains(resource.Name, "/") {
+				continue // Skip subresources
+			}
+			schemaName := strings.Join([]string{reverseGroup, gv.Version, resource.Kind}, ".")
+			schema, found := openApiSpec.Components.Schemas[schemaName]
+			if !found {
+				log.Fatalf("schema not found for: %s", schemaName)
+			}
+
+			spec, found := schema.Properties["spec"]
+			if !found {
+				continue
+			}
+
+			typ, err := types.ObjectFromOpenApi(spec, []string{})
+			if err != nil {
+				log.Fatal(err.Error())
+			}
+			objectTyp, ok := typ.(types.KubernetesObjectType)
+			if !ok {
+				log.Fatalf("expected KubernetesObjectType, got %T", objectTyp)
+			}
+
+			info := generic.TypeInfo{
+				Group:    gv.Group,
+				Version:  gv.Version,
+				Kind:     resource.Kind,
+				Resource: resource.Name,
+				Schema:   objectTyp,
+			}
+			info.Codegen(&builder)
+			builder.WriteString(", ")
+		}
+	}
+
+	builder.WriteString("}")
+
 	fmt.Println(builder.String())
 }

@@ -1,30 +1,22 @@
 package generic
 
 import (
-	"bytes"
 	"context"
-	"errors"
 	"fmt"
-	"io"
+	"strconv"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	runtimeschema "k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kube-openapi/pkg/validation/spec"
-
-	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 )
-
-type Version string
-type CrdName string
 
 type TypeInfo struct {
 	Group    string
 	Resource string
 	Kind     string
 	Version  string
-	Schema   map[string]interface{}
+	Schema   types.KubernetesObjectType
 }
 
 func (t TypeInfo) GroupVersionResource() runtimeschema.GroupVersionResource {
@@ -35,120 +27,18 @@ func (t TypeInfo) GroupVersionResource() runtimeschema.GroupVersionResource {
 	}
 }
 
-func LoadCrds(yaml []byte) (map[CrdName]map[Version]TypeInfo, error) {
-	yamlReader := bytes.NewReader(yaml)
-	decoder := utilyaml.NewYAMLOrJSONDecoder(yamlReader, 4096)
-
-	result := map[CrdName]map[Version]TypeInfo{}
-	for i := 0; ; i += 1 {
-		obj := &unstructured.Unstructured{}
-		err := decoder.Decode(&obj)
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			return nil, err
-		}
-
-		crdName, found, err := unstructured.NestedString(obj.UnstructuredContent(), "metadata", "name")
-		if err != nil {
-			return nil, err
-		}
-		if !found {
-			return nil, fmt.Errorf("field not found: metadata.name")
-		}
-
-		crd, err := loadCrd(*obj)
-		if err != nil {
-			return nil, err
-		}
-		result[CrdName(crdName)] = crd
-	}
-	return result, nil
+func (t TypeInfo) Codegen(builder *strings.Builder) {
+	builder.WriteString("{")
+	builder.WriteString(fmt.Sprintf("Group: %s, ", strconv.Quote(t.Group)))
+	builder.WriteString(fmt.Sprintf("Resource: %s, ", strconv.Quote(t.Resource)))
+	builder.WriteString(fmt.Sprintf("Kind: %s, ", strconv.Quote(t.Kind)))
+	builder.WriteString(fmt.Sprintf("Version: %s, ", strconv.Quote(t.Version)))
+	builder.WriteString("Schema: ")
+	t.Schema.Codegen(builder)
+	builder.WriteString("}")
 }
 
-func loadCrd(obj unstructured.Unstructured) (map[Version]TypeInfo, error) {
-	group, found, err := unstructured.NestedString(obj.UnstructuredContent(), "spec", "group")
-	if err != nil {
-		return nil, err
-	} else if !found {
-		return nil, fmt.Errorf("field not found: spec.group")
-	}
-
-	kind, found, err := unstructured.NestedString(obj.UnstructuredContent(), "spec", "names", "kind")
-	if err != nil {
-		return nil, err
-	} else if !found {
-		return nil, fmt.Errorf("field not found: spec.names.kind")
-	}
-
-	resource, found, err := unstructured.NestedString(obj.UnstructuredContent(), "spec", "names", "plural")
-	if err != nil {
-		return nil, err
-	} else if !found {
-		return nil, fmt.Errorf("field not found: spec.names.resource")
-	}
-
-	versions, found, err := unstructured.NestedSlice(obj.UnstructuredContent(), "spec", "versions")
-	if err != nil {
-		return nil, err
-	} else if !found {
-		return nil, fmt.Errorf("field not found: spec.versions")
-	}
-
-	typeInfos := make(map[Version]TypeInfo, len(versions))
-	for _, version := range versions {
-		versionObj, ok := version.(map[string]interface{})
-		if !ok {
-			return nil, fmt.Errorf("expected object, found %t", version)
-		}
-
-		versionName, found, err := unstructured.NestedString(versionObj, "name")
-		if err != nil {
-			return nil, err
-		} else if !found {
-			return nil, fmt.Errorf("field not found: spec.versions[*].name")
-		}
-
-		schemaField, found, err := unstructured.NestedFieldNoCopy(versionObj, "schema", "openAPIV3Schema")
-		if err != nil {
-			return nil, err
-		} else if !found {
-			return nil, fmt.Errorf("field not found: spec.versions[*].name")
-		}
-
-		schema, ok := schemaField.(map[string]interface{})
-		if !ok {
-			return nil, fmt.Errorf("expected object, found %t", schemaField)
-		}
-		typeInfos[Version(versionName)] = TypeInfo{
-			Group:    group,
-			Version:  versionName,
-			Resource: resource,
-			Kind:     kind,
-			Schema:   schema,
-		}
-	}
-
-	return typeInfos, nil
-}
-
-func OpenApiToTfSchema(ctx context.Context, openapi *spec.Schema, datasource bool) (*schema.Schema, error) {
-	properties := openapi.Properties
-	if properties == nil {
-		return nil, fmt.Errorf("object has no properties")
-	}
-
-	specProperties, found := properties["spec"]
-	if !found {
-		return nil, fmt.Errorf("object doesn't include spec")
-	}
-
-	customType, err := types.ObjectFromOpenApi(specProperties, []string{"spec"})
-	if err != nil {
-		return nil, err
-	}
-
+func OpenApiToTfSchema(ctx context.Context, customType types.KubernetesType, datasource bool) (*schema.Schema, error) {
 	specAttribute, err := customType.SchemaType(ctx, datasource, !datasource)
 	if err != nil {
 		return nil, err
