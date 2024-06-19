@@ -1,26 +1,48 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
-	"slices"
 	"strings"
 
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/generic"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/provider"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types"
+	flag "github.com/spf13/pflag"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeschema "k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/openapi3"
+	"k8s.io/kube-openapi/pkg/spec3"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
+var kubeconfig *string = flag.String("kubeconfig", os.Getenv("KUBECONFIG"), "Kubernetes config file path")
+
+func getSchema(openapi *spec3.OpenAPI, gv runtimeschema.GroupVersion, resource metav1.APIResource) (*spec.Schema, error) {
+	path := fmt.Sprintf("/apis/%s/%s/namespaces/{namespace}/%s/{name}", gv.Group, gv.Version, resource.Name)
+	response := openapi.Paths.Paths[path].PathProps.Get.Responses.StatusCodeResponses[200]
+	schemaRef := response.ResponseProps.Content["application/json"].MediaTypeProps.Schema
+	maybeSchema, _, err := schemaRef.Ref.GetPointer().Get(openapi)
+	if err != nil {
+		return nil, err
+	}
+	schema, ok := maybeSchema.(*spec.Schema)
+	if !ok {
+		return nil, fmt.Errorf("expected schema, got %T", maybeSchema)
+	}
+	return schema, nil
+}
+
 func main() {
+	flag.Parse()
+
 	file, err := os.Create("crd.go")
 	if err != nil {
 		log.Fatal(err.Error())
 	}
 
-	// TODO: Use env var here
-	config, err := os.ReadFile("../../../examples/k8scrd/kubeconfig.yaml")
+	config, err := os.ReadFile(*kubeconfig)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
@@ -47,13 +69,9 @@ func main() {
 		if err != nil {
 			log.Fatal(err.Error())
 		}
-		// TODO: Make this configurable
-		if gv.Group != "example.com" {
+		if gv.Group != flag.Arg(0) {
 			continue
 		}
-		groupComponents := strings.Split(gv.Group, ".")
-		slices.Reverse(groupComponents)
-		reverseGroup := strings.Join(groupComponents, ".")
 
 		openApiSpec, err := root.GVSpec(gv)
 		if err != nil {
@@ -64,10 +82,9 @@ func main() {
 			if strings.Contains(resource.Name, "/") {
 				continue // Skip subresources
 			}
-			schemaName := strings.Join([]string{reverseGroup, gv.Version, resource.Kind}, ".")
-			schema, found := openApiSpec.Components.Schemas[schemaName]
-			if !found {
-				log.Fatalf("schema not found for: %s", schemaName)
+			schema, err := getSchema(openApiSpec, gv, resource)
+			if err != nil {
+				log.Fatalf(err.Error())
 			}
 
 			spec, found := schema.Properties["spec"]
@@ -75,7 +92,7 @@ func main() {
 				continue
 			}
 
-			typ, err := types.ObjectFromOpenApi(spec, []string{})
+			typ, err := types.OpenApiToTfType(openApiSpec, spec, []string{})
 			if err != nil {
 				log.Fatal(err.Error())
 			}

@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 func primitiveSchemaType(_ context.Context, attr attr.Type, isDatasource, isRequired bool) (schema.Attribute, error) {
@@ -151,4 +152,27 @@ func primitiveCodegen(attr interface{}, builder io.StringWriter) error {
 		err = fmt.Errorf("no codegen for type %T", attr)
 	}
 	return err
+}
+
+func isPrimitive(openapi spec.Schema) bool {
+	if len(openapi.Type) > 0 {
+		for _, typ := range openapi.Type {
+			switch typ {
+			case "integer", "number", "string":
+				continue
+			default:
+				return false
+			}
+		}
+		return true
+	}
+	if len(openapi.OneOf) > 0 {
+		for _, typ := range openapi.OneOf {
+			if !isPrimitive(typ) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
 }

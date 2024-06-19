@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+	"k8s.io/kube-openapi/pkg/spec3"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
@@ -142,13 +143,13 @@ func (t KubernetesListType) Codegen(builder io.StringWriter) {
 	builder.WriteString("}")
 }
 
-func ListFromOpenApi(openapi spec.Schema, path []string) (KubernetesType, error) {
+func ListFromOpenApi(root *spec3.OpenAPI, openapi spec.Schema, path []string) (KubernetesType, error) {
 	items := openapi.Items.Schema
 	if items == nil {
 		return nil, fmt.Errorf("expected map of items at %s", strings.Join(path, ""))
 	}
 
-	elemType, err := openApiToTfType(*items, append(path, "[*]"))
+	elemType, err := OpenApiToTfType(root, *items, append(path, "[*]"))
 	if err != nil {
 		return nil, err
 	}

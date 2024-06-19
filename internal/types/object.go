@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	strcase "github.com/stoewer/go-strcase"
+	"k8s.io/kube-openapi/pkg/spec3"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
@@ -179,7 +180,6 @@ func (t KubernetesObjectType) Codegen(builder io.StringWriter) {
 		if kubernetesAttr, ok := attr.(KubernetesType); ok {
 			kubernetesAttr.Codegen(builder)
 		} else {
-			// TODO
 			primitiveCodegen(attr, builder)
 		}
 		builder.WriteString(",")
@@ -199,17 +199,14 @@ func (t KubernetesObjectType) Codegen(builder io.StringWriter) {
 	builder.WriteString("}")
 }
 
-func ObjectFromOpenApi(openapi spec.Schema, path []string) (KubernetesType, error) {
+func ObjectFromOpenApi(root *spec3.OpenAPI, openapi spec.Schema, path []string) (KubernetesType, error) {
 	properties := openapi.Properties
-	if properties == nil {
-		return nil, fmt.Errorf("expected properties at %s", strings.Join(path, ""))
-	}
 
 	attrTypes := make(map[string]attr.Type, len(properties))
 	fieldNames := make(map[string]string, len(properties))
 	for k, property := range properties {
 		attrPath := append(path, fmt.Sprintf(".%s", k))
-		attribute, err := openApiToTfType(property, attrPath)
+		attribute, err := OpenApiToTfType(root, property, attrPath)
 		if err != nil {
 			return nil, err
 		}
@@ -231,20 +228,40 @@ func ObjectFromOpenApi(openapi spec.Schema, path []string) (KubernetesType, erro
 	}, nil
 }
 
-func openApiToTfType(openapi spec.Schema, path []string) (attr.Type, error) {
-	if len(openapi.Type) != 1 {
+func OpenApiToTfType(root *spec3.OpenAPI, openapi spec.Schema, path []string) (attr.Type, error) {
+	if pointer := openapi.Ref.GetPointer(); !pointer.IsEmpty() {
+		// TODO: Special-case ObjectMeta
+		maybeSchema, _, err := pointer.Get(root)
+		if err != nil {
+			return nil, err
+		}
+		schema, ok := maybeSchema.(*spec.Schema)
+		if !ok {
+			return nil, fmt.Errorf("expected schema at ref %s, got %T", strings.Join(path, ""), maybeSchema)
+		}
+		return OpenApiToTfType(root, *schema, path)
+	}
+	if len(openapi.Type) == 0 && len(openapi.AllOf) == 1 {
+		return OpenApiToTfType(root, openapi.AllOf[0], path)
+	}
+	var ty string
+	if len(openapi.Type) == 1 {
+		ty = openapi.Type[0]
+	} else if isPrimitive(openapi) {
+		ty = "string"
+	} else {
 		return nil, fmt.Errorf("expected exactly one type at %s", strings.Join(path, ""))
 	}
 
-	switch ty := openapi.Type[0]; ty {
+	switch ty {
 	case "object":
 		if openapi.AdditionalProperties != nil {
-			return MapFromOpenApi(openapi, path)
+			return MapFromOpenApi(root, openapi, path)
 		} else {
-			return ObjectFromOpenApi(openapi, path)
+			return ObjectFromOpenApi(root, openapi, path)
 		}
 	case "array":
-		return ListFromOpenApi(openapi, path)
+		return ListFromOpenApi(root, openapi, path)
 	case "string":
 		return basetypes.StringType{}, nil
 	case "integer":
