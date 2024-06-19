@@ -3,7 +3,7 @@ package types
 import (
 	"context"
 	"fmt"
-	"strings"
+	"io"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -138,7 +138,7 @@ func dynamicTupleFromUnstructured(ctx context.Context, path path.Path, val []int
 	return obj, diags
 }
 
-func primitiveCodegen(attr interface{}, builder *strings.Builder) error {
+func primitiveCodegen(attr interface{}, builder io.StringWriter) error {
 	var err error
 	switch attr := attr.(type) {
 	case basetypes.StringType:

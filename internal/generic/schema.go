@@ -3,8 +3,8 @@ package generic
 import (
 	"context"
 	"fmt"
+	"io"
 	"strconv"
-	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types"
@@ -27,7 +27,7 @@ func (t TypeInfo) GroupVersionResource() runtimeschema.GroupVersionResource {
 	}
 }
 
-func (t TypeInfo) Codegen(builder *strings.Builder) {
+func (t TypeInfo) Codegen(builder io.StringWriter) {
 	builder.WriteString("{")
 	builder.WriteString(fmt.Sprintf("Group: %s, ", strconv.Quote(t.Group)))
 	builder.WriteString(fmt.Sprintf("Resource: %s, ", strconv.Quote(t.Resource)))

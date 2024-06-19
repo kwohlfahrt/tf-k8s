@@ -3,6 +3,7 @@ package types
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -128,7 +129,7 @@ func (t KubernetesMapType) SchemaType(ctx context.Context, isDatasource bool, is
 	}
 }
 
-func (t KubernetesMapType) Codegen(builder *strings.Builder) {
+func (t KubernetesMapType) Codegen(builder io.StringWriter) {
 	builder.WriteString("types.KubernetesMapType{")
 	builder.WriteString("MapType: basetypes.MapType{")
 	builder.WriteString("ElemType: ")

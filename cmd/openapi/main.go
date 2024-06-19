@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"slices"
@@ -15,7 +14,13 @@ import (
 )
 
 func main() {
-	config, err := os.ReadFile("./kubeconfig.yaml")
+	file, err := os.Create("crd.go")
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
+	// TODO: Use env var here
+	config, err := os.ReadFile("../../../examples/k8scrd/kubeconfig.yaml")
 	if err != nil {
 		log.Fatal(err.Error())
 	}
@@ -30,19 +35,19 @@ func main() {
 		log.Fatal(err)
 	}
 
-	var builder strings.Builder
-	builder.WriteString("package internal\n\n")
-	builder.WriteString("import (\n")
-	builder.WriteString("\t\"github.com/hashicorp/terraform-plugin-framework/attr\"\n")
-	builder.WriteString("\t\"github.com/hashicorp/terraform-plugin-framework/types/basetypes\"\n")
-	builder.WriteString("\t\"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types\"\n")
-	builder.WriteString("\t\"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/generic\"\n")
-	builder.WriteString(")\n\nvar TypeInfos = []generic.TypeInfo{")
+	file.WriteString("package crd\n\n")
+	file.WriteString("import (\n")
+	file.WriteString("\t\"github.com/hashicorp/terraform-plugin-framework/attr\"\n")
+	file.WriteString("\t\"github.com/hashicorp/terraform-plugin-framework/types/basetypes\"\n")
+	file.WriteString("\t\"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types\"\n")
+	file.WriteString("\t\"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/generic\"\n")
+	file.WriteString(")\n\nvar TypeInfos = []generic.TypeInfo{")
 	for _, resourceList := range resourceLists {
 		gv, err := runtimeschema.ParseGroupVersion(resourceList.GroupVersion)
 		if err != nil {
 			log.Fatal(err.Error())
 		}
+		// TODO: Make this configurable
 		if gv.Group != "example.com" {
 			continue
 		}
@@ -86,12 +91,10 @@ func main() {
 				Resource: resource.Name,
 				Schema:   objectTyp,
 			}
-			info.Codegen(&builder)
-			builder.WriteString(", ")
+			info.Codegen(file)
+			file.WriteString(", ")
 		}
 	}
 
-	builder.WriteString("}")
-
-	fmt.Println(builder.String())
+	file.WriteString("}")
 }

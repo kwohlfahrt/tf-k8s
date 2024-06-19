@@ -3,6 +3,7 @@ package types
 import (
 	"context"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 
@@ -21,7 +22,7 @@ type KubernetesType interface {
 
 	SchemaType(ctx context.Context, isDatasource, isRequired bool) (schema.Attribute, error)
 	ValueFromUnstructured(ctx context.Context, path path.Path, obj interface{}) (attr.Value, diag.Diagnostics)
-	Codegen(builder *strings.Builder)
+	Codegen(builder io.StringWriter)
 }
 
 type KubernetesObjectType struct {
@@ -168,7 +169,7 @@ func (t KubernetesObjectType) SchemaType(ctx context.Context, isDatasource bool,
 		CustomType: t,
 	}, nil
 }
-func (t KubernetesObjectType) Codegen(builder *strings.Builder) {
+func (t KubernetesObjectType) Codegen(builder io.StringWriter) {
 	builder.WriteString("types.KubernetesObjectType{")
 	builder.WriteString("ObjectType: basetypes.ObjectType{")
 	builder.WriteString("AttrTypes: map[string]attr.Type{")

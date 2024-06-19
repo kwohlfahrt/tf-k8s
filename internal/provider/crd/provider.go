@@ -1,3 +1,4 @@
+//go:generate ../../../openapi
 package crd
 
 import (
@@ -9,7 +10,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/generic"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/provider"
 )
@@ -78,6 +78,6 @@ func (p *CrdProvider) Functions(context.Context) []func() function.Function {
 
 func New(version string) (func() tfprovider.Provider, error) {
 	return func() tfprovider.Provider {
-		return &CrdProvider{version: version, typeInfos: internal.TypeInfos}
+		return &CrdProvider{version: version, typeInfos: TypeInfos}
 	}, nil
 }
