@@ -3,6 +3,8 @@ package types
 import (
 	"context"
 	"fmt"
+	"io"
+	"strconv"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -12,6 +14,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	strcase "github.com/stoewer/go-strcase"
+	"k8s.io/kube-openapi/pkg/spec3"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 type KubernetesType interface {
@@ -19,13 +23,14 @@ type KubernetesType interface {
 
 	SchemaType(ctx context.Context, isDatasource, isRequired bool) (schema.Attribute, error)
 	ValueFromUnstructured(ctx context.Context, path path.Path, obj interface{}) (attr.Value, diag.Diagnostics)
+	Codegen(builder io.StringWriter)
 }
 
 type KubernetesObjectType struct {
 	basetypes.ObjectType
 
-	fieldNames     map[string]string
-	requiredFields map[string]bool
+	FieldNames     map[string]string
+	RequiredFields map[string]bool
 }
 
 func (t KubernetesObjectType) Equal(o attr.Type) bool {
@@ -44,7 +49,7 @@ func (t KubernetesObjectType) String() string {
 func (t KubernetesObjectType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
 	value := KubernetesObjectValue{
 		ObjectValue: in,
-		fieldNames:  t.fieldNames,
+		fieldNames:  t.FieldNames,
 	}
 	return value, nil
 }
@@ -70,7 +75,7 @@ func (t KubernetesObjectType) ValueFromTerraform(ctx context.Context, in tftypes
 
 func (t KubernetesObjectType) ValueType(ctx context.Context) attr.Value {
 	return KubernetesObjectValue{
-		fieldNames: t.fieldNames,
+		fieldNames: t.FieldNames,
 	}
 }
 
@@ -88,7 +93,7 @@ func (t KubernetesObjectType) ValueFromUnstructured(ctx context.Context, path pa
 	attributes := make(map[string]attr.Value, len(mapObj))
 	for k, attrType := range t.AttrTypes {
 		fieldPath := path.AtName(k)
-		fieldName, found := t.fieldNames[k]
+		fieldName, found := t.FieldNames[k]
 		if !found {
 			diags.Append(diag.NewAttributeErrorDiagnostic(
 				fieldPath, "Unexpected field",
@@ -129,7 +134,7 @@ func (t KubernetesObjectType) ValueFromUnstructured(ctx context.Context, path pa
 func (t KubernetesObjectType) SchemaAttributes(ctx context.Context, isDatasource bool, isRequired bool) (map[string]schema.Attribute, error) {
 	attributes := make(map[string]schema.Attribute, len(t.AttrTypes))
 	for k, attr := range t.AttrTypes {
-		isRequired := t.requiredFields[k]
+		isRequired := t.RequiredFields[k]
 		var schemaType schema.Attribute
 		var err error
 
@@ -165,23 +170,43 @@ func (t KubernetesObjectType) SchemaType(ctx context.Context, isDatasource bool,
 		CustomType: t,
 	}, nil
 }
-
-func ObjectFromOpenApi(openapi map[string]interface{}, path []string) (KubernetesType, error) {
-	properties, ok := openapi["properties"].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("expected map of properties at %s", strings.Join(path, ""))
+func (t KubernetesObjectType) Codegen(builder io.StringWriter) {
+	builder.WriteString("types.KubernetesObjectType{")
+	builder.WriteString("ObjectType: basetypes.ObjectType{")
+	builder.WriteString("AttrTypes: map[string]attr.Type{")
+	for k, attr := range t.ObjectType.AttrTypes {
+		builder.WriteString(strconv.Quote(k))
+		builder.WriteString(": ")
+		if kubernetesAttr, ok := attr.(KubernetesType); ok {
+			kubernetesAttr.Codegen(builder)
+		} else {
+			primitiveCodegen(attr, builder)
+		}
+		builder.WriteString(",")
 	}
+	builder.WriteString("},")
+	builder.WriteString("},")
+	builder.WriteString("RequiredFields: map[string]bool{")
+	for k, v := range t.RequiredFields {
+		builder.WriteString(fmt.Sprintf("%s: %t,", strconv.Quote(k), v))
+	}
+	builder.WriteString("},")
+	builder.WriteString("FieldNames: map[string]string{")
+	for k, v := range t.FieldNames {
+		builder.WriteString(fmt.Sprintf("%s: %s,", strconv.Quote(k), strconv.Quote(v)))
+	}
+	builder.WriteString("},")
+	builder.WriteString("}")
+}
+
+func ObjectFromOpenApi(root *spec3.OpenAPI, openapi spec.Schema, path []string) (KubernetesType, error) {
+	properties := openapi.Properties
 
 	attrTypes := make(map[string]attr.Type, len(properties))
 	fieldNames := make(map[string]string, len(properties))
-	for k, v := range properties {
+	for k, property := range properties {
 		attrPath := append(path, fmt.Sprintf(".%s", k))
-		property, ok := v.(map[string]interface{})
-		if !ok {
-			return nil, fmt.Errorf("expected object at %s", strings.Join(attrPath, ""))
-		}
-
-		attribute, err := openApiToTfType(property, attrPath)
+		attribute, err := OpenApiToTfType(root, property, attrPath)
 		if err != nil {
 			return nil, err
 		}
@@ -190,41 +215,53 @@ func ObjectFromOpenApi(openapi map[string]interface{}, path []string) (Kubernete
 		fieldNames[fieldName] = k
 	}
 
-	rawRequired, found := openapi["required"]
-	if !found {
-		rawRequired = []interface{}{}
-	}
-	required, ok := rawRequired.([]interface{})
-	if !ok {
-		return nil, fmt.Errorf("expected list of required fields at %s", strings.Join(path, ""))
-	}
+	required := openapi.Required
 	requiredFields := make(map[string]bool, len(required))
-	for i, field := range required {
-		fieldName, ok := field.(string)
-		if !ok {
-			indexPath := append(path, fmt.Sprintf("[%d]", i))
-			return nil, fmt.Errorf("expected name of required fields at %s", strings.Join(indexPath, ""))
-		}
+	for _, fieldName := range required {
 		requiredFields[strcase.SnakeCase(fieldName)] = true
 	}
 
 	return KubernetesObjectType{
 		ObjectType:     basetypes.ObjectType{AttrTypes: attrTypes},
-		fieldNames:     fieldNames,
-		requiredFields: requiredFields,
+		FieldNames:     fieldNames,
+		RequiredFields: requiredFields,
 	}, nil
 }
 
-func openApiToTfType(openapi map[string]interface{}, path []string) (attr.Type, error) {
-	switch ty := openapi["type"]; ty {
+func OpenApiToTfType(root *spec3.OpenAPI, openapi spec.Schema, path []string) (attr.Type, error) {
+	if pointer := openapi.Ref.GetPointer(); !pointer.IsEmpty() {
+		// TODO: Special-case ObjectMeta
+		maybeSchema, _, err := pointer.Get(root)
+		if err != nil {
+			return nil, err
+		}
+		schema, ok := maybeSchema.(*spec.Schema)
+		if !ok {
+			return nil, fmt.Errorf("expected schema at ref %s, got %T", strings.Join(path, ""), maybeSchema)
+		}
+		return OpenApiToTfType(root, *schema, path)
+	}
+	if len(openapi.Type) == 0 && len(openapi.AllOf) == 1 {
+		return OpenApiToTfType(root, openapi.AllOf[0], path)
+	}
+	var ty string
+	if len(openapi.Type) == 1 {
+		ty = openapi.Type[0]
+	} else if isPrimitive(openapi) {
+		ty = "string"
+	} else {
+		return nil, fmt.Errorf("expected exactly one type at %s", strings.Join(path, ""))
+	}
+
+	switch ty {
 	case "object":
-		if _, isMap := openapi["additionalProperties"]; isMap {
-			return MapFromOpenApi(openapi, path)
+		if openapi.AdditionalProperties != nil {
+			return MapFromOpenApi(root, openapi, path)
 		} else {
-			return ObjectFromOpenApi(openapi, path)
+			return ObjectFromOpenApi(root, openapi, path)
 		}
 	case "array":
-		return ListFromOpenApi(openapi, path)
+		return ListFromOpenApi(root, openapi, path)
 	case "string":
 		return basetypes.StringType{}, nil
 	case "integer":
@@ -264,7 +301,7 @@ func (v KubernetesObjectValue) Type(ctx context.Context) attr.Type {
 		ObjectType: basetypes.ObjectType{
 			AttrTypes: v.AttributeTypes(ctx),
 		},
-		fieldNames: v.fieldNames,
+		FieldNames: v.fieldNames,
 	}
 }
 
@@ -334,7 +371,7 @@ func DynamicObjectFromUnstructured(ctx context.Context, path path.Path, val map[
 	}
 	typ := KubernetesObjectType{
 		ObjectType: basetypes.ObjectType{AttrTypes: attrTypes},
-		fieldNames: fieldNames,
+		FieldNames: fieldNames,
 	}
 
 	obj, objDiags := basetypes.NewObjectValue(attrTypes, attrValues)

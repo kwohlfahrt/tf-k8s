@@ -3,6 +3,7 @@ package types
 import (
 	"context"
 	"fmt"
+	"io"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -10,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 func primitiveSchemaType(_ context.Context, attr attr.Type, isDatasource, isRequired bool) (schema.Attribute, error) {
@@ -135,4 +137,42 @@ func dynamicTupleFromUnstructured(ctx context.Context, path path.Path, val []int
 	obj, objDiags := basetypes.NewTupleValue(elemTypes, elemValues)
 	diags.Append(objDiags...)
 	return obj, diags
+}
+
+func primitiveCodegen(attr interface{}, builder io.StringWriter) error {
+	var err error
+	switch attr := attr.(type) {
+	case basetypes.StringType:
+		_, err = builder.WriteString("basetypes.StringType{}")
+	case basetypes.Int64Type:
+		_, err = builder.WriteString("basetypes.Int64Type{}")
+	case basetypes.BoolType:
+		_, err = builder.WriteString("basetypes.BoolType{}")
+	default:
+		err = fmt.Errorf("no codegen for type %T", attr)
+	}
+	return err
+}
+
+func isPrimitive(openapi spec.Schema) bool {
+	if len(openapi.Type) > 0 {
+		for _, typ := range openapi.Type {
+			switch typ {
+			case "integer", "number", "string":
+				continue
+			default:
+				return false
+			}
+		}
+		return true
+	}
+	if len(openapi.OneOf) > 0 {
+		for _, typ := range openapi.OneOf {
+			if !isPrimitive(typ) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
 }

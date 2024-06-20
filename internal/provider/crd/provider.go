@@ -1,3 +1,4 @@
+//go:generate openapi example.com
 package crd
 
 import (
@@ -9,14 +10,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/generic"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/provider"
 )
 
 type CrdProvider struct {
 	version   string
-	typeInfos map[generic.CrdName]map[generic.Version]generic.TypeInfo
+	typeInfos []generic.TypeInfo
 }
 
 type CrdProviderModel struct {
@@ -58,20 +58,16 @@ func (p *CrdProvider) Configure(ctx context.Context, req tfprovider.ConfigureReq
 
 func (p *CrdProvider) DataSources(context.Context) []func() datasource.DataSource {
 	result := make([]func() datasource.DataSource, 0, len(p.typeInfos))
-	for _, typeInfos := range p.typeInfos {
-		for _, typeInfo := range typeInfos {
-			result = append(result, func() datasource.DataSource { return NewDataSource(typeInfo) })
-		}
+	for _, typeInfo := range p.typeInfos {
+		result = append(result, func() datasource.DataSource { return NewDataSource(typeInfo) })
 	}
 	return result
 }
 
 func (p *CrdProvider) Resources(context.Context) []func() resource.Resource {
 	result := make([]func() resource.Resource, 0, len(p.typeInfos))
-	for _, typeInfos := range p.typeInfos {
-		for _, typeInfo := range typeInfos {
-			result = append(result, func() resource.Resource { return NewResource(typeInfo) })
-		}
+	for _, typeInfo := range p.typeInfos {
+		result = append(result, func() resource.Resource { return NewResource(typeInfo) })
 	}
 	return result
 }
@@ -81,12 +77,7 @@ func (p *CrdProvider) Functions(context.Context) []func() function.Function {
 }
 
 func New(version string) (func() tfprovider.Provider, error) {
-	typeInfos, err := generic.LoadCrds(internal.SchemaBytes)
-	if err != nil {
-		return nil, err
-	}
-
 	return func() tfprovider.Provider {
-		return &CrdProvider{version: version, typeInfos: typeInfos}
+		return &CrdProvider{version: version, typeInfos: TypeInfos}
 	}, nil
 }

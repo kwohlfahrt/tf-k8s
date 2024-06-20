@@ -3,23 +3,23 @@ package types_test
 import (
 	"context"
 	_ "embed"
+	"slices"
 
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/generic"
+	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/provider/crd"
 )
 
 func TestRequiredFields(t *testing.T) {
-	typeInfos, err := generic.LoadCrds(internal.SchemaBytes)
-	if err != nil {
-		t.Fatal(err)
+	infoIdx := slices.IndexFunc(crd.TypeInfos, func(typeInfo generic.TypeInfo) bool {
+		return typeInfo.Group == "example.com" && typeInfo.Resource == "foos" && typeInfo.Version == "v1"
+	})
+	if infoIdx == -1 {
+		t.Fatal("CRD version not found: foos.example.com/v1")
 	}
-	typeInfo, found := typeInfos["foos.example.com"]["v1"]
-	if !found {
-		t.Fatal("CRD version not found: v1")
-	}
+	typeInfo := crd.TypeInfos[infoIdx]
 
 	result, err := generic.OpenApiToTfSchema(context.Background(), typeInfo.Schema, false)
 	if err != nil {
@@ -35,14 +35,13 @@ func TestRequiredFields(t *testing.T) {
 }
 
 func TestFieldType(t *testing.T) {
-	typeInfos, err := generic.LoadCrds(internal.SchemaBytes)
-	if err != nil {
-		t.Fatal(err)
+	infoIdx := slices.IndexFunc(crd.TypeInfos, func(typeInfo generic.TypeInfo) bool {
+		return typeInfo.Group == "example.com" && typeInfo.Resource == "foos" && typeInfo.Version == "v1"
+	})
+	if infoIdx == -1 {
+		t.Fatal("CRD version not found: foos.example.com/v1")
 	}
-	typeInfo, found := typeInfos["foos.example.com"]["v1"]
-	if !found {
-		t.Fatal("CRD version not found: v1")
-	}
+	typeInfo := crd.TypeInfos[infoIdx]
 
 	result, err := generic.OpenApiToTfSchema(context.Background(), typeInfo.Schema, false)
 	if err != nil {
