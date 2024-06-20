@@ -42,6 +42,11 @@ func main() {
 		log.Fatal(err.Error())
 	}
 
+	groups := make(map[string]bool, flag.NArg())
+	for _, arg := range flag.Args() {
+		groups[arg] = true
+	}
+
 	config, err := os.ReadFile(*kubeconfig)
 	if err != nil {
 		log.Fatal(err.Error())
@@ -69,7 +74,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err.Error())
 		}
-		if gv.Group != flag.Arg(0) {
+		if !groups[gv.Group] {
 			continue
 		}
 
