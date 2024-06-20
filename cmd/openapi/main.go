@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/generic"
@@ -19,8 +20,25 @@ import (
 
 var kubeconfig *string = flag.String("kubeconfig", os.Getenv("KUBECONFIG"), "Kubernetes config file path")
 
+func getPath(gv runtimeschema.GroupVersion, resource metav1.APIResource) string {
+	segments := make([]string, 1, 8)
+	if gv.Group == "" {
+		segments = append(segments, "api")
+	} else {
+		segments = append(segments, "apis", gv.Group)
+	}
+	segments = append(segments, gv.Version)
+
+	if resource.Namespaced {
+		segments = append(segments, "namespaces", "{namespace}")
+	}
+	segments = append(segments, resource.Name, "{name}")
+
+	return strings.Join(segments, "/")
+}
+
 func getSchema(openapi *spec3.OpenAPI, gv runtimeschema.GroupVersion, resource metav1.APIResource) (*spec.Schema, error) {
-	path := fmt.Sprintf("/apis/%s/%s/namespaces/{namespace}/%s/{name}", gv.Group, gv.Version, resource.Name)
+	path := getPath(gv, resource)
 	response := openapi.Paths.Paths[path].PathProps.Get.Responses.StatusCodeResponses[200]
 	schemaRef := response.ResponseProps.Content["application/json"].MediaTypeProps.Schema
 	maybeSchema, _, err := schemaRef.Ref.GetPointer().Get(openapi)
@@ -86,6 +104,10 @@ func main() {
 		for _, resource := range resourceList.APIResources {
 			if strings.Contains(resource.Name, "/") {
 				continue // Skip subresources
+			}
+			if slices.Index(resource.Verbs, "get") == -1 {
+				// We generate the schema from get endpoint, so skip non-gettable (for now)
+				continue
 			}
 			schema, err := getSchema(openApiSpec, gv, resource)
 			if err != nil {
