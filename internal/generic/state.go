@@ -42,10 +42,23 @@ func ObjectToState(ctx context.Context, state tfsdk.State, obj *unstructured.Uns
 	}
 
 	if _, needsId := state.Schema.GetAttributes()["id"]; needsId {
-		// TODO: Better error handling here.
 		metadata := content["metadata"].(map[string]interface{})
-		name := metadata["name"].(string)
-		namespace := metadata["namespace"].(string)
+		name, ok := metadata["name"].(string)
+		if !ok {
+			diags.Append(diag.NewAttributeErrorDiagnostic(
+				path.Root("metadata").AtName("name"),
+				"Expected value not found",
+				fmt.Sprintf("Expected string, got %T", metadata["name"]),
+			))
+		}
+		namespace, ok := metadata["namespace"].(string)
+		if !ok {
+			diags.Append(diag.NewAttributeErrorDiagnostic(
+				path.Root("metadata").AtName("namespace"),
+				"Expected value not found",
+				fmt.Sprintf("Expected string, got %T", metadata["namespace"]),
+			))
+		}
 		id := basetypes.NewStringValue(fmt.Sprintf("%s/%s", namespace, name))
 		attributes["id"] = id
 	}
