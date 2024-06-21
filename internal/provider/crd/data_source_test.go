@@ -66,3 +66,56 @@ func TestAccDataSource(t *testing.T) {
 		},
 	})
 }
+
+func TestAccDataSourceBuiltin(t *testing.T) {
+	kubeconfig, err := os.ReadFile("../../../examples/k8scrd/kubeconfig.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	config := map[string]interface{}{
+		"provider": map[string]interface{}{
+			"k8scrd": map[string]interface{}{
+				"kubeconfig": string(kubeconfig),
+			},
+		},
+		"data": map[string]interface{}{
+			"k8scrd_deployment_apps_v1": map[string]interface{}{
+				"foo": map[string]interface{}{
+					"metadata": map[string]interface{}{
+						"name":      "foo",
+						"namespace": "default",
+					},
+				},
+			},
+		},
+	}
+
+	configJson, err := json.Marshal(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	providerFactory, err := crd.New("test")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: map[string]func() (tfprotov6.ProviderServer, error){
+			"k8scrd": providerserver.NewProtocol6WithError(providerFactory()),
+		},
+		Steps: []resource.TestStep{
+			{
+				Config: string(configJson),
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue(
+						"data.k8scrd_deployment_apps_v1.foo",
+						tfjsonpath.New("spec").AtMapKey("replicas"),
+						knownvalue.Int64Exact(0),
+					),
+				},
+			},
+		},
+	})
+}

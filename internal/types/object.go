@@ -107,7 +107,7 @@ func (t KubernetesObjectType) ValueFromUnstructured(ctx context.Context, path pa
 			continue
 		}
 		value, found := mapObj[fieldName]
-		if !found {
+		if !found || value == nil {
 			attributes[k] = newNull(ctx, attrType)
 			continue
 		}
@@ -122,6 +122,7 @@ func (t KubernetesObjectType) ValueFromUnstructured(ctx context.Context, path pa
 		}
 		diags.Append(attrDiags...)
 		if attrDiags.HasError() {
+			attributes[k] = newNull(ctx, attrType)
 			continue
 		}
 		attributes[k] = attr
