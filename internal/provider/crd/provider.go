@@ -1,4 +1,4 @@
-//go:generate openapi example.com "apps"
+//go:generate openapi example.com "apps" ""
 package crd
 
 import (

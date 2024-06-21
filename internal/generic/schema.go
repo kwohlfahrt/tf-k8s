@@ -38,24 +38,49 @@ func (t TypeInfo) Codegen(builder io.StringWriter) {
 	builder.WriteString("}")
 }
 
-func OpenApiToTfSchema(ctx context.Context, customType types.KubernetesType, datasource bool) (*schema.Schema, error) {
-	specAttribute, err := customType.SchemaType(ctx, datasource, !datasource)
+func OpenApiToTfSchema(ctx context.Context, customType types.KubernetesObjectType, datasource bool) (*schema.Schema, error) {
+	attributes, err := customType.SchemaAttributes(ctx, datasource, !datasource)
 	if err != nil {
 		return nil, err
 	}
 
-	metaAttribute, err := types.MetadataType.SchemaType(ctx, false, true)
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO: Handle status field
-	attributes := make(map[string]schema.Attribute, 2)
 	if !datasource {
 		attributes["id"] = schema.StringAttribute{Computed: true}
 	}
-	attributes["metadata"] = metaAttribute
-	attributes["spec"] = specAttribute
+	meta, ok := attributes["metadata"].(schema.SingleNestedAttribute)
+	if !ok {
+		return nil, fmt.Errorf("expected object attribute at metadata")
+	}
+	meta.Computed = false
+	meta.Optional = false
+	meta.Required = true
+	for _, attrName := range []string{"name", "namespace"} {
+		attr, ok := meta.Attributes[attrName].(schema.StringAttribute)
+		if !ok {
+			return nil, fmt.Errorf("expected string attribute at metadata.%s", attrName)
+		}
+		attr.Computed = false
+		attr.Optional = false
+		attr.Required = true
+		meta.Attributes[attrName] = attr
+	}
+	for _, attrName := range []string{"uid", "creation_timestamp"} {
+		attr, ok := meta.Attributes[attrName].(schema.StringAttribute)
+		if !ok {
+			return nil, fmt.Errorf("expected string attribute at metadata.%s", attrName)
+		}
+		attr.Computed = true
+		attr.Required = false
+		attr.Optional = false
+		meta.Attributes[attrName] = attr
+	}
+	attributes["metadata"] = meta
+
+	status, ok := attributes["status"].(schema.SingleNestedAttribute)
+	if ok {
+		status.Computed = true
+		attributes["status"] = status
+	}
 
 	return &schema.Schema{Attributes: attributes}, nil
 }

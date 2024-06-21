@@ -13,7 +13,6 @@ import (
 	"k8s.io/client-go/dynamic"
 
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/generic"
-	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -75,14 +74,15 @@ func (c *crdDataSource) Schema(ctx context.Context, req datasource.SchemaRequest
 }
 
 func (c *crdDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var metadata types.ObjectMeta
-	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("metadata"), &metadata)...)
+	var name, namespace string
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("metadata").AtName("name"), &name)...)
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("metadata").AtName("namespace"), &namespace)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	obj, err := c.client.Resource(c.typeInfo.GroupVersionResource()).Namespace(metadata.Namespace).
-		Get(ctx, metadata.Name, metav1.GetOptions{})
+	obj, err := c.client.Resource(c.typeInfo.GroupVersionResource()).Namespace(namespace).
+		Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsGone(err) || errors.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)

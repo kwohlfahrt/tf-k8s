@@ -19,14 +19,13 @@ func ObjectToState(ctx context.Context, state tfsdk.State, obj *unstructured.Uns
 	content := obj.UnstructuredContent()
 	attributes := make(map[string]attr.Value, 3)
 
-	for _, k := range []string{"metadata", "spec"} {
+	for k, attr := range state.Schema.GetAttributes() {
 		path := path.Root(k)
-		fieldType, fieldDiags := state.Schema.TypeAtPath(ctx, path)
-		diags.Append(fieldDiags...)
-		if fieldDiags.HasError() {
+		if k == "id" {
 			continue
 		}
 
+		fieldType := attr.GetType()
 		kubernetesType, ok := fieldType.(types.KubernetesType)
 		if !ok {
 			diags.AddAttributeError(path, "Unexpected schema type", fmt.Sprintf("Expected KubernetesType, got %T", fieldType))

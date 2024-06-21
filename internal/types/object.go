@@ -81,6 +81,10 @@ func (t KubernetesObjectType) ValueType(ctx context.Context) attr.Value {
 
 func (t KubernetesObjectType) ValueFromUnstructured(ctx context.Context, path path.Path, obj interface{}) (attr.Value, diag.Diagnostics) {
 	var diags diag.Diagnostics
+	if obj == nil {
+		obj = make(map[string]interface{}, 0)
+	}
+
 	mapObj, ok := obj.(map[string]interface{})
 	if !ok {
 		diags.Append(diag.NewAttributeErrorDiagnostic(
@@ -310,7 +314,7 @@ func (v KubernetesObjectValue) ToUnstructured(ctx context.Context, path path.Pat
 	attributes := v.Attributes()
 	result := make(map[string]interface{}, len(attributes))
 	for k, attr := range attributes {
-		if attr.IsNull() {
+		if attr.IsNull() || attr.IsUnknown() {
 			continue
 		}
 

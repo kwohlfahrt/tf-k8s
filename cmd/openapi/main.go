@@ -114,12 +114,7 @@ func main() {
 				log.Fatalf(err.Error())
 			}
 
-			spec, found := schema.Properties["spec"]
-			if !found {
-				continue
-			}
-
-			typ, err := types.OpenApiToTfType(openApiSpec, spec, []string{})
+			typ, err := types.OpenApiToTfType(openApiSpec, *schema, []string{})
 			if err != nil {
 				log.Fatal(err.Error())
 			}
@@ -127,6 +122,27 @@ func main() {
 			if !ok {
 				log.Fatalf("expected KubernetesObjectType, got %T", objectTyp)
 			}
+			if _, found := objectTyp.AttrTypes["api_version"]; !found {
+				continue
+			}
+			delete(objectTyp.AttrTypes, "api_version")
+			if _, found := objectTyp.AttrTypes["kind"]; !found {
+				continue
+			}
+			delete(objectTyp.AttrTypes, "kind")
+			if _, found := objectTyp.AttrTypes["count"]; found {
+				// Count is reserved at top-level in TF schemas. We could rename
+				// it, but skip for now.
+				continue
+			}
+
+			metaTyp, ok := objectTyp.AttrTypes["metadata"].(types.KubernetesObjectType)
+			if !ok {
+				log.Fatalf("expected KubernetesObjectType at .metadata, got %T", objectTyp)
+			}
+			delete(metaTyp.AttrTypes, "managed_fields")
+			delete(metaTyp.AttrTypes, "generation")
+			delete(metaTyp.AttrTypes, "resource_version")
 
 			info := generic.TypeInfo{
 				Group:    gv.Group,
