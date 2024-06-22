@@ -1,0 +1,25 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request: ~
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+        TF_ACC: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - name: create kind cluster
+        run: |
+            kind create cluster --kubeconfig=./kubeconfig.yaml
+            echo KUBECONFIG=$(pwd)/kubeconfig.yaml >> "$GITHUB_ENV"
+      - run: ./examples/k8scrd/fixtures.sh
+      - run: go install ./cmd/openapi
+      - run: go generate ./...
+      - run: go test ./...

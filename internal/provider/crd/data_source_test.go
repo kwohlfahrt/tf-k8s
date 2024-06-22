@@ -15,7 +15,7 @@ import (
 )
 
 func TestAccDataSource(t *testing.T) {
-	kubeconfig, err := os.ReadFile("../../../examples/k8scrd/kubeconfig.yaml")
+	kubeconfig, err := os.ReadFile(os.Getenv("KUBECONFIG"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +68,7 @@ func TestAccDataSource(t *testing.T) {
 }
 
 func TestAccDataSourceBuiltin(t *testing.T) {
-	kubeconfig, err := os.ReadFile("../../../examples/k8scrd/kubeconfig.yaml")
+	kubeconfig, err := os.ReadFile(os.Getenv("KUBECONFIG"))
 	if err != nil {
 		t.Fatal(err)
 	}

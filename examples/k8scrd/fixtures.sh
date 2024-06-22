@@ -1,4 +1,6 @@
-#!/usr/bin/env bash -euo pipefail
+#!/usr/bin/env bash
+
+set -euo pipefail
 
 SRC_DIR=$(dirname ${BASH_SOURCE})/../..
 kubectl apply --server-side -f ${SRC_DIR}/internal/provider/crd/test.crds.yaml

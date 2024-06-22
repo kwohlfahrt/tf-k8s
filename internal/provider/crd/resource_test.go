@@ -19,7 +19,7 @@ import (
 )
 
 func TestAccResource(t *testing.T) {
-	kubeconfig, err := os.ReadFile("../../../examples/k8scrd/kubeconfig.yaml")
+	kubeconfig, err := os.ReadFile(os.Getenv("KUBECONFIG"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,7 +138,7 @@ func TestAccResource(t *testing.T) {
 }
 
 func TestAccResourceBuiltin(t *testing.T) {
-	kubeconfig, err := os.ReadFile("../../../examples/k8scrd/kubeconfig.yaml")
+	kubeconfig, err := os.ReadFile(os.Getenv("KUBECONFIG"))
 	if err != nil {
 		t.Fatal(err)
 	}
