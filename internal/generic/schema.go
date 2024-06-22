@@ -44,9 +44,6 @@ func OpenApiToTfSchema(ctx context.Context, customType types.KubernetesObjectTyp
 		return nil, err
 	}
 
-	if !datasource {
-		attributes["id"] = schema.StringAttribute{Computed: true}
-	}
 	meta, ok := attributes["metadata"].(schema.SingleNestedAttribute)
 	if !ok {
 		return nil, fmt.Errorf("expected object attribute at metadata")

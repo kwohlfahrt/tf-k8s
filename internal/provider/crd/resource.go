@@ -87,7 +87,7 @@ func (c *crdResource) Create(ctx context.Context, req tfresource.CreateRequest, 
 		return
 	}
 
-	state, diags := generic.ObjectToState(ctx, resp.State, obj)
+	state, diags := c.typeInfo.Schema.ValueFromUnstructured(ctx, path.Empty(), obj.UnstructuredContent())
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
@@ -114,7 +114,7 @@ func (c *crdResource) Read(ctx context.Context, req tfresource.ReadRequest, resp
 		return
 	}
 
-	state, diags := generic.ObjectToState(ctx, resp.State, obj)
+	state, diags := c.typeInfo.Schema.ValueFromUnstructured(ctx, path.Empty(), obj.UnstructuredContent())
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
@@ -145,7 +145,7 @@ func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, 
 		return
 	}
 
-	state, diags := generic.ObjectToState(ctx, resp.State, obj)
+	state, diags := c.typeInfo.Schema.ValueFromUnstructured(ctx, path.Empty(), obj.UnstructuredContent())
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
