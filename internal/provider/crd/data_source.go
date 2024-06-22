@@ -8,7 +8,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/path"
-	"github.com/stoewer/go-strcase"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/dynamic"
 
@@ -44,8 +43,11 @@ func NewDataSource(typeInfo generic.TypeInfo) datasource.DataSource {
 }
 
 func (c *crdDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
-	groupComponents := strings.Split(c.typeInfo.Group, ".")
-	nameComponents := []string{req.ProviderTypeName, strcase.SnakeCase(c.typeInfo.Kind)}
+	groupComponents := []string{}
+	if c.typeInfo.Group != "" {
+		groupComponents = strings.Split(c.typeInfo.Group, ".")
+	}
+	nameComponents := []string{req.ProviderTypeName, strings.ToLower(c.typeInfo.Kind)}
 	nameComponents = append(nameComponents, groupComponents...)
 	nameComponents = append(nameComponents, c.typeInfo.Version)
 	resp.TypeName = strings.Join(nameComponents, "_")
@@ -92,7 +94,7 @@ func (c *crdDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 		return
 	}
 
-	state, diags := generic.ObjectToState(ctx, resp.State, obj)
+	state, diags := c.typeInfo.Schema.ValueFromUnstructured(ctx, path.Empty(), obj.UnstructuredContent())
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return

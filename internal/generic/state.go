@@ -17,10 +17,9 @@ func ObjectToState(ctx context.Context, state tfsdk.State, obj *unstructured.Uns
 	var diags diag.Diagnostics
 
 	content := obj.UnstructuredContent()
-	schemaAttributes := state.Schema.GetAttributes()
-	attributes := make(map[string]attr.Value, len(schemaAttributes))
+	attributes := make(map[string]attr.Value, 3)
 
-	for k, attr := range schemaAttributes {
+	for k, attr := range state.Schema.GetAttributes() {
 		path := path.Root(k)
 		if k == "id" {
 			continue

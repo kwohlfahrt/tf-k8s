@@ -29,4 +29,12 @@ spec:
       containers:
       - name: foo
         image: busybox
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: foo
+data:
+  foo.txt: |
+    hello, world!
 EOF

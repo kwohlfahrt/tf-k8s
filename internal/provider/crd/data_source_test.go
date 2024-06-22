@@ -88,6 +88,14 @@ func TestAccDataSourceBuiltin(t *testing.T) {
 					},
 				},
 			},
+			"k8scrd_configmap_v1": map[string]interface{}{
+				"foo": map[string]interface{}{
+					"metadata": map[string]interface{}{
+						"name":      "foo",
+						"namespace": "default",
+					},
+				},
+			},
 		},
 	}
 
@@ -113,6 +121,11 @@ func TestAccDataSourceBuiltin(t *testing.T) {
 						"data.k8scrd_deployment_apps_v1.foo",
 						tfjsonpath.New("spec").AtMapKey("replicas"),
 						knownvalue.Int64Exact(0),
+					),
+					statecheck.ExpectKnownValue(
+						"data.k8scrd_configmap_v1.foo",
+						tfjsonpath.New("data").AtMapKey("foo.txt"),
+						knownvalue.StringExact("hello, world!\n"),
 					),
 				},
 			},
