@@ -2,7 +2,6 @@ package generic
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -15,35 +14,27 @@ import (
 func StateToObject(ctx context.Context, state tfsdk.Plan, typeInfo TypeInfo) (*unstructured.Unstructured, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
-	obj := make(map[string]interface{}, 4)
-
-	obj["kind"] = typeInfo.Kind
-	obj["apiVersion"] = typeInfo.GroupVersionResource().GroupVersion().String()
-
 	var stateValue basetypes.ObjectValue
 	diags.Append(state.Get(ctx, &stateValue)...)
 	if diags.HasError() {
 		return nil, diags
 	}
-	for k, attr := range stateValue.Attributes() {
-		path := path.Root(k)
-		if attr.IsNull() || attr.IsUnknown() {
-			continue
-		}
-		objAttr, ok := attr.(types.KubernetesObjectValue)
-		if !ok {
-			diags.AddAttributeError(
-				path, "Unexpected value type",
-				fmt.Sprintf("expected object value, got %T", attr))
-		}
-		attrObj, attrDiags := objAttr.ToUnstructured(ctx, path)
-		diags.Append(attrDiags...)
-		if attrDiags.HasError() {
-			continue
-		}
-		obj[k] = attrObj
+
+	value, valueDiags := typeInfo.Schema.ValueFromObject(ctx, stateValue)
+	diags.Append(valueDiags...)
+	if diags.HasError() {
+		return nil, diags
+	}
+	objectValue := value.(types.KubernetesObjectValue)
+	obj, objDiags := objectValue.ToUnstructured(ctx, path.Empty())
+	diags.Append(objDiags...)
+	if diags.HasError() {
+		return nil, diags
 	}
 
-	// Returned object may be inconsistent, if `diags` contains an error
-	return &unstructured.Unstructured{Object: obj}, diags
+	objMap := obj.(map[string]interface{})
+	objMap["kind"] = typeInfo.Kind
+	objMap["apiVersion"] = typeInfo.GroupVersionResource().GroupVersion().String()
+
+	return &unstructured.Unstructured{Object: objMap}, diags
 }

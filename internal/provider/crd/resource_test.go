@@ -136,3 +136,89 @@ func TestAccResource(t *testing.T) {
 		),
 	})
 }
+
+func TestAccResourceBuiltin(t *testing.T) {
+	kubeconfig, err := os.ReadFile("../../../examples/k8scrd/kubeconfig.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	k, err := provider.MakeDynamicClient(kubeconfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	config := map[string]interface{}{
+		"provider": map[string]interface{}{
+			"k8scrd": map[string]interface{}{
+				"kubeconfig": string(kubeconfig),
+			},
+		},
+		"resource": map[string]interface{}{
+			"k8scrd_configmap_v1": map[string]interface{}{
+				"bar": map[string]interface{}{
+					"metadata": map[string]interface{}{
+						"name":      "bar",
+						"namespace": "default",
+					},
+					"data": map[string]interface{}{
+						"foo.txt": "bar",
+					},
+				},
+			},
+		},
+	}
+
+	configJson, err := json.Marshal(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	providerFactory, err := crd.New("test")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: map[string]func() (tfprotov6.ProviderServer, error){
+			"k8scrd": providerserver.NewProtocol6WithError(providerFactory()),
+		},
+		Steps: []resource.TestStep{
+			{
+				Config: string(configJson),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectKnownValue(
+							"k8scrd_configmap_v1.bar",
+							tfjsonpath.New("data").AtMapKey("foo.txt"),
+							knownvalue.StringExact("bar"),
+						),
+					},
+				},
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue(
+						"k8scrd_configmap_v1.bar",
+						tfjsonpath.New("data").AtMapKey("foo.txt"),
+						knownvalue.StringExact("bar"),
+					),
+				},
+				Check: resource.ComposeTestCheckFunc(
+					checkExists(
+						k,
+						schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configmaps"},
+						types.ObjectMeta{Namespace: "default", Name: "bar"},
+						true,
+					),
+				),
+			},
+		},
+		CheckDestroy: resource.ComposeTestCheckFunc(
+			checkExists(
+				k,
+				schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configmaps"},
+				types.ObjectMeta{Namespace: "default", Name: "bar"},
+				false,
+			),
+		),
+	})
+}

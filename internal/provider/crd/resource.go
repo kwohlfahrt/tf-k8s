@@ -8,7 +8,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	tfresource "github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/generic"
-	"github.com/stoewer/go-strcase"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
@@ -24,9 +23,11 @@ func NewResource(typeInfo generic.TypeInfo) tfresource.Resource {
 }
 
 func (c *crdResource) Metadata(ctx context.Context, req tfresource.MetadataRequest, resp *tfresource.MetadataResponse) {
-	groupComponents := strings.Split(c.typeInfo.Group, ".")
-	nameComponents := []string{req.ProviderTypeName, strcase.SnakeCase(c.typeInfo.Kind)}
-
+	groupComponents := []string{}
+	if c.typeInfo.Group != "" {
+		groupComponents = strings.Split(c.typeInfo.Group, ".")
+	}
+	nameComponents := []string{req.ProviderTypeName, strings.ToLower(c.typeInfo.Kind)}
 	nameComponents = append(nameComponents, groupComponents...)
 	nameComponents = append(nameComponents, c.typeInfo.Version)
 	resp.TypeName = strings.Join(nameComponents, "_")
