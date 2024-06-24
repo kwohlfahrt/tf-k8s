@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"k8s.io/kube-openapi/pkg/spec3"
@@ -98,34 +99,32 @@ func (t KubernetesListType) ValueFromUnstructured(ctx context.Context, path path
 	return result, diags
 }
 
-func (t KubernetesListType) SchemaType(ctx context.Context, isDatasource bool, isRequired bool) (schema.Attribute, error) {
-	computed := isDatasource
-	optional := !isDatasource && !isRequired
-	required := !isDatasource && isRequired
-
+func (t KubernetesListType) SchemaType(ctx context.Context, required bool) (schema.Attribute, error) {
 	elem := t.ElementType()
 	if objectElem, ok := elem.(KubernetesObjectType); ok {
-		attributes, err := objectElem.SchemaAttributes(ctx, isDatasource, isRequired)
+		attributes, err := objectElem.SchemaAttributes(ctx, required)
 		if err != nil {
 			return nil, err
 		}
 		return schema.ListNestedAttribute{
 			Required:   required,
-			Optional:   optional,
-			Computed:   computed,
+			Optional:   !required,
+			Computed:   !required,
 			CustomType: t,
 			NestedObject: schema.NestedAttributeObject{
 				Attributes: attributes,
 				CustomType: objectElem,
 			},
+			PlanModifiers: []planmodifier.List{makeListPlanModifier()},
 		}, nil
 	} else {
 		return schema.ListAttribute{
-			Required:    required,
-			Optional:    optional,
-			Computed:    computed,
-			CustomType:  t,
-			ElementType: elem,
+			Required:      required,
+			Optional:      !required,
+			Computed:      !required,
+			CustomType:    t,
+			ElementType:   elem,
+			PlanModifiers: []planmodifier.List{makeListPlanModifier()},
 		}, nil
 	}
 }
@@ -200,3 +199,32 @@ func (v KubernetesListValue) Type(ctx context.Context) attr.Type {
 
 var _ basetypes.ListValuable = KubernetesListValue{}
 var _ KubernetesValue = KubernetesListValue{}
+
+type listPlanModifier struct{}
+
+func (o listPlanModifier) Description(context.Context) string {
+	return ""
+}
+
+func (o listPlanModifier) MarkdownDescription(context.Context) string {
+	return ""
+}
+
+func (o listPlanModifier) PlanModifyList(ctx context.Context, req planmodifier.ListRequest, resp *planmodifier.ListResponse) {
+	if req.State.Raw.IsNull() {
+		// Create phase, keep null values
+		return
+	}
+	if !req.PlanValue.IsUnknown() {
+		return
+	}
+	if req.ConfigValue.IsUnknown() {
+		return
+	}
+
+	resp.PlanValue = req.StateValue
+}
+
+func makeListPlanModifier() planmodifier.List {
+	return listPlanModifier{}
+}

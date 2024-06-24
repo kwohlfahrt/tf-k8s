@@ -38,8 +38,8 @@ func (t TypeInfo) Codegen(builder io.StringWriter) {
 	builder.WriteString("}")
 }
 
-func OpenApiToTfSchema(ctx context.Context, customType types.KubernetesObjectType, datasource bool) (*schema.Schema, error) {
-	attributes, err := customType.SchemaAttributes(ctx, datasource, !datasource)
+func OpenApiToTfSchema(ctx context.Context, customType types.KubernetesObjectType) (*schema.Schema, error) {
+	attributes, err := customType.SchemaAttributes(ctx, false)
 	if err != nil {
 		return nil, err
 	}

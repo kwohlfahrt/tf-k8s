@@ -17,6 +17,21 @@ data "k8scrd_foo_example_com_v1" "foo" {
   }
 }
 
+data "k8scrd_configmap_v1" "foo" {
+  metadata = {
+    name      = "foo"
+    namespace = "default"
+  }
+}
+
+
+data "k8scrd_deployment_apps_v1" "foo" {
+  metadata = {
+    name      = "foo"
+    namespace = "default"
+  }
+}
+
 resource "k8scrd_foo_example_com_v1" "bar" {
   metadata = {
     name      = "bar"
@@ -27,16 +42,30 @@ resource "k8scrd_foo_example_com_v1" "bar" {
   }
 }
 
-resource "k8scrd_bar_example_com_v1" "bar" {
+resource "k8scrd_configmap_v1" "bar" {
   metadata = {
     name      = "bar"
     namespace = "default"
   }
-  spec = {
-    bar = "bar"
+  data = {
+    "foo.txt" = "hello, world!"
   }
 }
 
-output "cert_spec" {
-  value = data.k8scrd_foo_example_com_v1.foo.spec
+resource "k8scrd_deployment_apps_v1" "bar" {
+  metadata = {
+    name      = "bar"
+    namespace = "default"
+    labels    = { app = "bar" }
+  }
+  spec = {
+    replicas = 0
+    selector = { match_labels = { app = "bar" } }
+    template = {
+      metadata = { labels = { app = "bar" } }
+      spec = {
+        containers = [{ name = "bar", image = "busybox" }]
+      }
+    }
+  }
 }

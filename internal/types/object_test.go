@@ -21,7 +21,7 @@ func TestRequiredFields(t *testing.T) {
 	}
 	typeInfo := crd.TypeInfos[infoIdx]
 
-	result, err := generic.OpenApiToTfSchema(context.Background(), typeInfo.Schema, false)
+	result, err := generic.OpenApiToTfSchema(context.Background(), typeInfo.Schema)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,7 +43,7 @@ func TestFieldType(t *testing.T) {
 	}
 	typeInfo := crd.TypeInfos[infoIdx]
 
-	result, err := generic.OpenApiToTfSchema(context.Background(), typeInfo.Schema, false)
+	result, err := generic.OpenApiToTfSchema(context.Background(), typeInfo.Schema)
 	if err != nil {
 		t.Fatal(err)
 	}
