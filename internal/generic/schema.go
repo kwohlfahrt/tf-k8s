@@ -38,8 +38,8 @@ func (t TypeInfo) Codegen(builder io.StringWriter) {
 	builder.WriteString("}")
 }
 
-func OpenApiToTfSchema(ctx context.Context, customType types.KubernetesObjectType, datasource bool) (*schema.Schema, error) {
-	attributes, err := customType.SchemaAttributes(ctx, datasource, !datasource)
+func OpenApiToTfSchema(ctx context.Context, customType types.KubernetesObjectType) (*schema.Schema, error) {
+	attributes, err := customType.SchemaAttributes(ctx, false)
 	if err != nil {
 		return nil, err
 	}
@@ -59,16 +59,6 @@ func OpenApiToTfSchema(ctx context.Context, customType types.KubernetesObjectTyp
 		attr.Computed = false
 		attr.Optional = false
 		attr.Required = true
-		meta.Attributes[attrName] = attr
-	}
-	for _, attrName := range []string{"uid", "creation_timestamp"} {
-		attr, ok := meta.Attributes[attrName].(schema.StringAttribute)
-		if !ok {
-			return nil, fmt.Errorf("expected string attribute at metadata.%s", attrName)
-		}
-		attr.Computed = true
-		attr.Required = false
-		attr.Optional = false
 		meta.Attributes[attrName] = attr
 	}
 	attributes["metadata"] = meta

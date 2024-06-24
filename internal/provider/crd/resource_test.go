@@ -155,6 +155,32 @@ func TestAccResourceBuiltin(t *testing.T) {
 			},
 		},
 		"resource": map[string]interface{}{
+			"k8scrd_deployment_apps_v1": map[string]interface{}{
+				"bar": map[string]interface{}{
+					"metadata": map[string]interface{}{
+						"name":      "bar",
+						"namespace": "default",
+						"labels":    map[string]string{"app": "bar"},
+					},
+					"spec": map[string]interface{}{
+						"replicas": 0,
+						"selector": map[string]interface{}{
+							"match_labels": map[string]string{"app": "bar"},
+						},
+						"template": map[string]interface{}{
+							"metadata": map[string]interface{}{
+								"labels": map[string]string{"app": "bar"},
+							},
+							"spec": map[string]interface{}{
+								"containers": []map[string]interface{}{{
+									"name":  "foo",
+									"image": "busybox",
+								}},
+							},
+						},
+					},
+				},
+			},
 			"k8scrd_configmap_v1": map[string]interface{}{
 				"bar": map[string]interface{}{
 					"metadata": map[string]interface{}{
@@ -189,6 +215,11 @@ func TestAccResourceBuiltin(t *testing.T) {
 				ConfigPlanChecks: resource.ConfigPlanChecks{
 					PreApply: []plancheck.PlanCheck{
 						plancheck.ExpectKnownValue(
+							"k8scrd_deployment_apps_v1.bar",
+							tfjsonpath.New("spec").AtMapKey("replicas"),
+							knownvalue.Int64Exact(0),
+						),
+						plancheck.ExpectKnownValue(
 							"k8scrd_configmap_v1.bar",
 							tfjsonpath.New("data").AtMapKey("foo.txt"),
 							knownvalue.StringExact("bar"),
@@ -197,12 +228,23 @@ func TestAccResourceBuiltin(t *testing.T) {
 				},
 				ConfigStateChecks: []statecheck.StateCheck{
 					statecheck.ExpectKnownValue(
+						"k8scrd_deployment_apps_v1.bar",
+						tfjsonpath.New("spec").AtMapKey("replicas"),
+						knownvalue.Int64Exact(0),
+					),
+					statecheck.ExpectKnownValue(
 						"k8scrd_configmap_v1.bar",
 						tfjsonpath.New("data").AtMapKey("foo.txt"),
 						knownvalue.StringExact("bar"),
 					),
 				},
 				Check: resource.ComposeTestCheckFunc(
+					checkExists(
+						k,
+						schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
+						types.ObjectMeta{Namespace: "default", Name: "bar"},
+						true,
+					),
 					checkExists(
 						k,
 						schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configmaps"},
@@ -213,6 +255,12 @@ func TestAccResourceBuiltin(t *testing.T) {
 			},
 		},
 		CheckDestroy: resource.ComposeTestCheckFunc(
+			checkExists(
+				k,
+				schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
+				types.ObjectMeta{Namespace: "default", Name: "bar"},
+				false,
+			),
 			checkExists(
 				k,
 				schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configmaps"},

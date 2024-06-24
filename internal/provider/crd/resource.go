@@ -34,7 +34,7 @@ func (c *crdResource) Metadata(ctx context.Context, req tfresource.MetadataReque
 }
 
 func (c *crdResource) Schema(ctx context.Context, req tfresource.SchemaRequest, resp *tfresource.SchemaResponse) {
-	result, err := generic.OpenApiToTfSchema(ctx, c.typeInfo.Schema, false)
+	result, err := generic.OpenApiToTfSchema(ctx, c.typeInfo.Schema)
 	if err != nil {
 		resp.Diagnostics.AddError("Could not convert CRD to schema", err.Error())
 		return
@@ -88,7 +88,7 @@ func (c *crdResource) Create(ctx context.Context, req tfresource.CreateRequest, 
 		return
 	}
 
-	state, diags := c.typeInfo.Schema.ValueFromUnstructured(ctx, path.Empty(), obj.UnstructuredContent())
+	state, diags := generic.ObjectToState(ctx, c.typeInfo.Schema, *obj)
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
@@ -115,7 +115,7 @@ func (c *crdResource) Read(ctx context.Context, req tfresource.ReadRequest, resp
 		return
 	}
 
-	state, diags := c.typeInfo.Schema.ValueFromUnstructured(ctx, path.Empty(), obj.UnstructuredContent())
+	state, diags := generic.ObjectToState(ctx, c.typeInfo.Schema, *obj)
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
@@ -146,7 +146,7 @@ func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, 
 		return
 	}
 
-	state, diags := c.typeInfo.Schema.ValueFromUnstructured(ctx, path.Empty(), obj.UnstructuredContent())
+	state, diags := generic.ObjectToState(ctx, c.typeInfo.Schema, *obj)
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
