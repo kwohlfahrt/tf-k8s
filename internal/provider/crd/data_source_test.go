@@ -2,6 +2,7 @@ package crd_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"testing"
 
@@ -29,7 +30,7 @@ func TestAccDataSource(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rawCheckSpec, err := os.ReadFile("fixtures/core-data-test.json")
+	rawCheckSpec, err := os.ReadFile(fmt.Sprintf("fixtures/%s-data-test.json", os.Getenv("PROVIDER")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +40,7 @@ func TestAccDataSource(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cfg, err := os.ReadFile("./fixtures/core-data.tf")
+	cfg, err := os.ReadFile(fmt.Sprintf("./fixtures/%s-data.tf", os.Getenv("PROVIDER")))
 	if err != nil {
 		t.Fatal(err)
 	}
