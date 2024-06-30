@@ -16,7 +16,7 @@
             "GroupVersionResource": {
                 "group": "example.com",
                 "version": "v1",
-                "resource": "foo"
+                "resource": "foos"
             },
             "Metadata": {
                 "name": "bar",
@@ -27,7 +27,7 @@
             "GroupVersionResource": {
                 "group": "example.com",
                 "version": "v1",
-                "resource": "bar"
+                "resource": "bars"
             },
             "Metadata": {
                 "name": "bar",
