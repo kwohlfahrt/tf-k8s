@@ -4,4 +4,6 @@ core:
     - apps
     - batch
 example.com:
+  apiGroups:
+    - "example.com"
   skipPublish: true

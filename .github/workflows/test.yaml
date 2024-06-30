@@ -6,20 +6,49 @@ on:
   pull_request: ~
 
 jobs:
+  get-providers:
+    runs-on: ubuntu-latest
+    outputs:
+      providers: ${{ steps.list-providers.outputs.keys }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: list-providers
+        run: |
+          echo 'keys<<EOF' >> $GITHUB_OUTPUT
+          yq -o json 'keys' < internal/provider/crd/versions.yaml >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
+
   test:
     runs-on: ubuntu-latest
+    needs: [get-providers]
+    strategy:
+      fail-fast: false
+      matrix:
+        provider: ${{ fromJson(needs.get-providers.outputs.providers) }}
     env:
         TF_ACC: "1"
+        PROVIDER: ${{ matrix.provider }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: '1.22'
+
       - name: create kind cluster
         run: |
             kind create cluster --kubeconfig=./kubeconfig.yaml
             echo KUBECONFIG=$(pwd)/kubeconfig.yaml >> "$GITHUB_ENV"
-      - run: ./examples/k8scrd/fixtures.sh
+
+      - name: install fixtures
+        run: |
+          [[ -e internal/provider/crd/fixtures/${PROVIDER}-crds.yaml ]] && kubectl apply -f internal/provider/crd/fixtures/${PROVIDER}-crds.yaml
+          kubectl apply -f internal/provider/crd/fixtures/${PROVIDER}-data.yaml
+
+      - name: configure provider
+        run: |
+          API_GROUPS=$(yq -o json '.["'"${PROVIDER}"'"].apiGroups[]' < internal/provider/crd/versions.yaml)
+          sed -i -e "1 s|example\\.com$|$(echo ${API_GROUPS})|" internal/provider/crd/provider.go
+
       - run: go install ./cmd/openapi
-      - run: go generate ./...
+      - run: go generate -x ./...
       - run: go test ./...
