@@ -3,25 +3,46 @@ package types_test
 import (
 	"context"
 	_ "embed"
-	"slices"
 
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/generic"
-	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/provider/crd"
+	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types"
 )
 
-func TestRequiredFields(t *testing.T) {
-	infoIdx := slices.IndexFunc(crd.TypeInfos, func(typeInfo generic.TypeInfo) bool {
-		return typeInfo.Group == "example.com" && typeInfo.Resource == "foos" && typeInfo.Version == "v1"
-	})
-	if infoIdx == -1 {
-		t.Fatal("CRD version not found: foos.example.com/v1")
-	}
-	typeInfo := crd.TypeInfos[infoIdx]
+var testSchema types.KubernetesObjectType = types.KubernetesObjectType{
+	ObjectType: basetypes.ObjectType{
+		AttrTypes: map[string]attr.Type{
+			"metadata": types.KubernetesObjectType{
+				ObjectType: basetypes.ObjectType{
+					AttrTypes: map[string]attr.Type{
+						"name":      basetypes.StringType{},
+						"namespace": basetypes.StringType{},
+					},
+				},
+				FieldNames:     map[string]string{"name": "name", "namespace": "namespace"},
+				RequiredFields: map[string]bool{"name": true, "namespace": true},
+			},
+			"spec": types.KubernetesObjectType{
+				ObjectType: basetypes.ObjectType{
+					AttrTypes: map[string]attr.Type{
+						"foo": basetypes.StringType{},
+						"bar": basetypes.StringType{},
+					},
+				},
+				FieldNames:     map[string]string{"foo": "foo", "bar": "bar"},
+				RequiredFields: map[string]bool{"foo": true},
+			},
+		},
+	},
+	FieldNames: map[string]string{"spec": "spec", "metadata": "metadata"},
+}
 
-	result, err := generic.OpenApiToTfSchema(context.Background(), typeInfo.Schema)
+func TestRequiredFields(t *testing.T) {
+	result, err := generic.OpenApiToTfSchema(context.Background(), testSchema)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,15 +56,7 @@ func TestRequiredFields(t *testing.T) {
 }
 
 func TestFieldType(t *testing.T) {
-	infoIdx := slices.IndexFunc(crd.TypeInfos, func(typeInfo generic.TypeInfo) bool {
-		return typeInfo.Group == "example.com" && typeInfo.Resource == "foos" && typeInfo.Version == "v1"
-	})
-	if infoIdx == -1 {
-		t.Fatal("CRD version not found: foos.example.com/v1")
-	}
-	typeInfo := crd.TypeInfos[infoIdx]
-
-	result, err := generic.OpenApiToTfSchema(context.Background(), typeInfo.Schema)
+	result, err := generic.OpenApiToTfSchema(context.Background(), testSchema)
 	if err != nil {
 		t.Fatal(err)
 	}

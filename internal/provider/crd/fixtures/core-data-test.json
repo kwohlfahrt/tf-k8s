@@ -1,0 +1,14 @@
+{
+    "Properties": [
+        {
+            "Name": "data.k8scrd_deployment_apps_v1.foo",
+            "Path": "spec.replicas",
+            "Value": "0"
+        },
+        {
+            "Name": "data.k8scrd_configmap_v1.foo",
+            "Path": "data.foo.txt",
+            "Value": "hello, world!\n"
+        }
+    ]
+}
