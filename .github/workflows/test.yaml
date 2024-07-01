@@ -15,7 +15,9 @@ jobs:
       - id: list-providers
         run: |
           echo 'keys<<EOF' >> $GITHUB_OUTPUT
-          yq -o json 'keys' < internal/provider/crd/versions.yaml >> $GITHUB_OUTPUT
+          ls internal/provider/crd/versions \
+            | xargs -I{} basename {} .yaml \
+            | jq --null-input --raw-input '[inputs]' >> $GITHUB_OUTPUT
           echo 'EOF' >> $GITHUB_OUTPUT
 
   test:
@@ -41,12 +43,12 @@ jobs:
 
       - name: install fixtures
         run: |
-          [[ -e internal/provider/crd/fixtures/${PROVIDER}-crds.yaml ]] && kubectl apply -f internal/provider/crd/fixtures/${PROVIDER}-crds.yaml
-          kubectl apply -f internal/provider/crd/fixtures/${PROVIDER}-data.yaml
+          [[ -e internal/provider/crd/fixtures/${PROVIDER}/crds.yaml ]] && kubectl apply -f internal/provider/crd/fixtures/${PROVIDER}/crds.yaml
+          kubectl apply -f internal/provider/crd/fixtures/${PROVIDER}/data.yaml
 
       - name: configure provider
         run: |
-          API_GROUPS=$(yq -o json '.["'"${PROVIDER}"'"].apiGroups[]' < internal/provider/crd/versions.yaml)
+          API_GROUPS=$(yq -o json '.apiGroups[]' < internal/provider/crd/versions/${PROVIDER}.yaml)
           sed -i -e "1 s|example\\.com$|$(echo ${API_GROUPS})|" internal/provider/crd/provider.go
 
       - run: go install ./cmd/openapi

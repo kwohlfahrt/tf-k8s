@@ -1,9 +1,0 @@
-core:
-  apiGroups:
-    - ""
-    - apps
-    - batch
-example.com:
-  apiGroups:
-    - "example.com"
-  skipPublish: true

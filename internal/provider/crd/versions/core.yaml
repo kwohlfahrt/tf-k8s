@@ -1,0 +1,5 @@
+apiGroups:
+  - ""
+  - apps
+  - batch
+crdSources: {}

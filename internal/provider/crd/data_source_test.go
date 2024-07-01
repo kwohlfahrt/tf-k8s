@@ -30,7 +30,7 @@ func TestAccDataSource(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rawCheckSpec, err := os.ReadFile(fmt.Sprintf("fixtures/%s-data-test.json", os.Getenv("PROVIDER")))
+	rawCheckSpec, err := os.ReadFile(fmt.Sprintf("fixtures/%s/data-test.json", os.Getenv("PROVIDER")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +40,7 @@ func TestAccDataSource(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cfg, err := os.ReadFile(fmt.Sprintf("./fixtures/%s-data.tf", os.Getenv("PROVIDER")))
+	cfg, err := os.ReadFile(fmt.Sprintf("./fixtures/%s/data.tf", os.Getenv("PROVIDER")))
 	if err != nil {
 		t.Fatal(err)
 	}
