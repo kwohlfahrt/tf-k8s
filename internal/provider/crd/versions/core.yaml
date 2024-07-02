@@ -2,4 +2,4 @@ apiGroups:
   - ""
   - apps
   - batch
-crdSources: {}
+crdSources: []

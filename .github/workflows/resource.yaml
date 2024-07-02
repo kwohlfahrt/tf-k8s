@@ -1,0 +1,94 @@
+name: Build Resource Provider
+
+on:
+  release:
+    types: [created]
+  push:
+    branches: [main]
+  pull_request: ~
+
+jobs:
+  get-providers:
+    if: ${{ !github.event.release || startswith(github.event.release.tag_name, 'resource-') }}
+    runs-on: ubuntu-latest
+    outputs:
+      providers: ${{ steps.list-providers.outputs.keys || steps.tag-provider.outputs.keys }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: tag-provider
+        if: github.event.release
+        run: |
+          echo "${{ github.event.release.tag_name }}" \
+            | sed -nr 's/^resource-([a-z]+)-[0-9.]+$/keys=["\1"]/p' >> $GITHUB_OUTPUT
+      - id: list-providers
+        if: ${{ !github.event.release }}
+        run: |
+          echo 'keys<<EOF' >> $GITHUB_OUTPUT
+          ls internal/provider/crd/versions \
+            | xargs -I{} basename {} .yaml \
+            | jq --null-input --raw-input '[inputs]' >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
+
+  test:
+    runs-on: ubuntu-latest
+    needs: [get-providers]
+    strategy:
+      fail-fast: false
+      matrix:
+        provider: ${{ fromJson(needs.get-providers.outputs.providers) }}
+    env:
+        TF_ACC: "1"
+        PROVIDER: ${{ matrix.provider }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: create kind cluster
+        run: |
+            kind create cluster --kubeconfig=./kubeconfig.yaml
+            echo KUBECONFIG=$(pwd)/kubeconfig.yaml >> "$GITHUB_ENV"
+
+      - name: install fixtures
+        run: |
+          yq -o json '.crdSources[]' < internal/provider/crd/versions/${PROVIDER}.yaml \
+            | xargs -I'{}' kubectl apply -f '{}'
+          kubectl apply -f internal/provider/crd/fixtures/${PROVIDER}/data.yaml
+
+      - name: configure provider
+        run: |
+          API_GROUPS=$(yq -o json '.apiGroups[]' < internal/provider/crd/versions/${PROVIDER}.yaml)
+          sed -i -e "1 s|example\\.com$|$(echo ${API_GROUPS})|" internal/provider/crd/provider.go
+
+      - name: go generate
+        run: |
+          go install ./cmd/openapi
+          go generate -x ./internal/provider/crd/...
+
+      - name: go test
+        run: |
+          go test ./...
+
+      - name: go build
+        id: build
+        run: |
+          PROVIDER_NAME=terraform-provider-k8s-$(echo $PROVIDER | sed -e 's/\./-/')
+          echo provider-name=$PROVIDER_NAME >> $GITHUB_OUTPUT
+          go build -o $PROVIDER_NAME ./cmd/provider
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.build.outputs.provider-name }}
+          path: ${{ steps.build.outputs.provider-name }}
+
+  publish:
+    if: github.event.release != null
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - uses: actions/download-artifact@v4
+      - uses: softprops/action-gh-release@2
+        with:
+          files: |
+            terraform-provider-k8s-*
