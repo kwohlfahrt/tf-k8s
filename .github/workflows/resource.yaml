@@ -1,27 +1,28 @@
 name: Build Resource Provider
 
 on:
-  release:
-    types: [created, edited]
   push:
     branches: [main]
+    # Draft releases don't trigger actions, so create releases in the workflow
+    # from tag events.
+    tags: [resource-*]
   pull_request: ~
 
 jobs:
   get-providers:
-    if: ${{ !github.event.release || startswith(github.event.release.tag_name, 'resource-') }}
+    if: ${{ github.event.pull_request || startswith(github.event.ref, 'refs/tags/resource-') }}
     runs-on: ubuntu-latest
     outputs:
       providers: ${{ steps.list-providers.outputs.keys || steps.tag-provider.outputs.keys }}
     steps:
       - uses: actions/checkout@v4
       - id: tag-provider
-        if: github.event.release
+        if: startswith(github.event.ref, 'refs/tags/')
         run: |
-          echo "${{ github.event.release.tag_name }}" \
-            | sed -nr 's/^resource-([a-z]+)-[0-9.]+$/keys=["\1"]/p' >> $GITHUB_OUTPUT
+          echo "${{ github.ref_name }}" \
+            | sed -nr 's/^resource-([a-z]+)-v[0-9.]+$/keys=["\1"]/p' >> $GITHUB_OUTPUT
       - id: list-providers
-        if: ${{ !github.event.release }}
+        if: ${{ !startswith(github.event.ref, 'refs/tags/') }}
         run: |
           echo 'keys<<EOF' >> $GITHUB_OUTPUT
           ls internal/provider/crd/versions \
@@ -83,12 +84,21 @@ jobs:
           path: ${{ steps.build.outputs.provider-name }}
 
   publish:
-    if: github.event.release != null
+    if: startswith(github.event.ref, 'refs/tags/')
     runs-on: ubuntu-latest
-    needs: [test]
+    needs: [test, get-providers]
+    permissions:
+      contents: write
     steps:
+      - name: parse tag
+        id: meta
+        run: |
+          echo "${{ github.ref_name }}" \
+            | sed -nr 's/^resource-([a-z]+)-(v.*)$/name=\1\nversion=\2/p' >> $GITHUB_OUTPUT
       - uses: actions/download-artifact@v4
       - uses: softprops/action-gh-release@2
         with:
+          name: ${{ steps.meta.outputs.name }} ${{ steps.meta.outputs.version }}
+          draft: true
           files: |
             terraform-provider-k8s-*
