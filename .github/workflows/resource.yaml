@@ -19,8 +19,7 @@ jobs:
       - id: tag-provider
         if: startswith(github.event.ref, 'refs/tags/')
         run: |
-          echo "${{ github.ref_name }}" \
-            | sed -nr 's/^resource-([a-z]+)-v[0-9.]+$/keys=["\1"]/p' >> $GITHUB_OUTPUT
+          echo "${{ github.ref_name }}" | sed -nr 's/^resource-([a-z]+)-v.*$/keys=["\1"]/p' >> $GITHUB_OUTPUT
       - id: list-providers
         if: ${{ !startswith(github.event.ref, 'refs/tags/') }}
         run: |
