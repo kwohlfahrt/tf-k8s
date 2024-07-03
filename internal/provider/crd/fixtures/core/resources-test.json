@@ -1,0 +1,38 @@
+{
+    "Properties": [
+        {
+            "Name": "k8scrd_configmap_v1.bar",
+            "Path": "data.foo.txt",
+            "Value": "bar"
+        },
+        {
+            "Name": "k8scrd_deployment_apps_v1.bar",
+            "Path": "spec.replicas",
+            "Value": "0"
+        }
+    ],
+    "Resources": [
+        {
+            "GroupVersionResource": {
+                "group": "",
+                "version": "v1",
+                "resource": "configmaps"
+            },
+            "Metadata": {
+                "name": "bar",
+                "namespace": "default"
+            }
+        },
+        {
+            "GroupVersionResource": {
+                "group": "apps",
+                "version": "v1",
+                "resource": "deployments"
+            },
+            "Metadata": {
+                "name": "bar",
+                "namespace": "default"
+            }
+        }
+    ]
+}

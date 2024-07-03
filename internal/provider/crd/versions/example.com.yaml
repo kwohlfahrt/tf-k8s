@@ -1,0 +1,5 @@
+apiGroups:
+  - example.com
+crdSources:
+  - internal/provider/crd/fixtures/example.com/crds.yaml
+skipPublish: true

@@ -1,0 +1,38 @@
+{
+    "Properties": [
+        {
+            "Name": "k8scrd_foo_example_com_v1.bar",
+            "Path": "spec.foo",
+            "Value": "bar"
+        },
+        {
+            "Name": "k8scrd_bar_example_com_v1.bar",
+            "Path": "spec.bar",
+            "Value": "bar"
+        }
+    ],
+    "Resources": [
+        {
+            "GroupVersionResource": {
+                "group": "example.com",
+                "version": "v1",
+                "resource": "foos"
+            },
+            "Metadata": {
+                "name": "bar",
+                "namespace": "default"
+            }
+        },
+        {
+            "GroupVersionResource": {
+                "group": "example.com",
+                "version": "v1",
+                "resource": "bars"
+            },
+            "Metadata": {
+                "name": "bar",
+                "namespace": "default"
+            }
+        }
+    ]
+}
