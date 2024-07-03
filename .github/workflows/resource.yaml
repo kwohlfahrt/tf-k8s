@@ -95,7 +95,7 @@ jobs:
           echo "${{ github.ref_name }}" \
             | sed -nr 's/^resource-([a-z]+)-(v.*)$/name=\1\nversion=\2/p' >> $GITHUB_OUTPUT
       - uses: actions/download-artifact@v4
-      - uses: softprops/action-gh-release@2
+      - uses: softprops/action-gh-release@v2
         with:
           name: ${{ steps.meta.outputs.name }} ${{ steps.meta.outputs.version }}
           draft: true
