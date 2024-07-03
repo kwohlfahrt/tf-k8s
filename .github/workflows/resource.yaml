@@ -2,7 +2,7 @@ name: Build Resource Provider
 
 on:
   release:
-    types: [created]
+    types: [created, edited]
   push:
     branches: [main]
   pull_request: ~
