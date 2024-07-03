@@ -99,5 +99,6 @@ jobs:
         with:
           name: ${{ steps.meta.outputs.name }} ${{ steps.meta.outputs.version }}
           draft: true
+          fail_on_unmatched_files: true
           files: |
             terraform-provider-k8s-*
