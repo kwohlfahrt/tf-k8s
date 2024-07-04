@@ -19,7 +19,7 @@ jobs:
       - id: tag-provider
         if: startswith(github.event.ref, 'refs/tags/')
         run: |
-          echo "${{ github.ref_name }}" | sed -nr 's/^resource-([a-z]+)-v.*$/keys=["\1"]/p' >> $GITHUB_OUTPUT
+          echo "${{ github.ref_name }}" | sed -nr 's/^resource-([a-z.]+)-v.*$/keys=["\1"]/p' >> $GITHUB_OUTPUT
       - id: list-providers
         if: ${{ !startswith(github.event.ref, 'refs/tags/') }}
         run: |
@@ -129,7 +129,7 @@ jobs:
         id: meta
         run: |
           echo "${{ github.ref_name }}" \
-            | sed -nr 's/^resource-([a-z]+)-(v.*)$/name=\1\nversion=\2/p' >> $GITHUB_OUTPUT
+            | sed -nr 's/^resource-([a-z.]+)-(v.*)$/name=\1\nversion=\2/p' >> $GITHUB_OUTPUT
       - uses: actions/download-artifact@v4
         with:
           merge-multiple: true
