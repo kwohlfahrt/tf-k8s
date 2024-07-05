@@ -10,7 +10,6 @@ on:
 
 jobs:
   get-providers:
-    if: ${{ github.event.pull_request || startswith(github.event.ref, 'refs/tags/resource-') }}
     runs-on: ubuntu-latest
     outputs:
       providers: ${{ steps.list-providers.outputs.keys || steps.tag-provider.outputs.keys }}
