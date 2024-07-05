@@ -33,6 +33,17 @@
                 "name": "bar",
                 "namespace": "default"
             }
+        },
+        {
+            "GroupVersionResource": {
+                "group": "apps",
+                "version": "v1",
+                "resource": "deployments"
+            },
+            "Metadata": {
+                "name": "baz",
+                "namespace": "default"
+            }
         }
     ]
 }

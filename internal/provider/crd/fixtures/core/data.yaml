@@ -26,3 +26,23 @@ spec:
       containers:
       - name: foo
         image: busybox
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: baz
+  labels:
+    app: baz
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: baz
+  template:
+    metadata:
+      labels:
+        app: baz
+    spec:
+      containers:
+      - name: baz
+        image: busybox

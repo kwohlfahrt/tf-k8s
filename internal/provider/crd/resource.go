@@ -170,7 +170,18 @@ func (c *crdResource) Delete(ctx context.Context, req tfresource.DeleteRequest, 
 	}
 }
 
+func (c *crdResource) ImportState(ctx context.Context, req tfresource.ImportStateRequest, resp *tfresource.ImportStateResponse) {
+	if strings.Contains(req.ID, "/") {
+		components := strings.SplitN(req.ID, "/", 2)
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("metadata").AtName("namespace"), components[0])...)
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("metadata").AtName("name"), components[1])...)
+	} else {
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("metadata").AtName("name"), req.ID)...)
+	}
+}
+
 var (
-	_ tfresource.Resource              = &crdResource{}
-	_ tfresource.ResourceWithConfigure = &crdResource{}
+	_ tfresource.Resource                = &crdResource{}
+	_ tfresource.ResourceWithConfigure   = &crdResource{}
+	_ tfresource.ResourceWithImportState = &crdResource{}
 )
