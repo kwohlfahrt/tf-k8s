@@ -52,8 +52,8 @@ jobs:
       - name: install fixtures
         run: |
           yq -o json '.crdSources[]' < internal/provider/crd/versions/${PROVIDER}.yaml \
-            | xargs -I'{}' kubectl apply -f '{}'
-          kubectl apply -f internal/provider/crd/fixtures/${PROVIDER}/data.yaml
+            | xargs -I'{}' kubectl apply --server-side -f '{}'
+          kubectl apply --server-side -f internal/provider/crd/fixtures/${PROVIDER}/data.yaml
 
       - name: configure provider
         run: |
