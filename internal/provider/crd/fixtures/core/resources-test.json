@@ -9,6 +9,21 @@
             "Name": "k8scrd_deployment_apps_v1.bar",
             "Path": "spec.replicas",
             "Value": "0"
+        },
+        {
+            "Name": "k8scrd_deployment_apps_v1.baz",
+            "Path": "spec.replicas",
+            "Value": "0"
+        },
+        {
+            "Name": "k8scrd_namespace_v1.bar",
+            "Path": "metadata.name",
+            "Value": "bar"
+        },
+        {
+            "Name": "k8scrd_namespace_v1.baz",
+            "Path": "metadata.name",
+            "Value": "baz"
         }
     ],
     "Resources": [
@@ -39,6 +54,28 @@
                 "group": "apps",
                 "version": "v1",
                 "resource": "deployments"
+            },
+            "Metadata": {
+                "name": "baz",
+                "namespace": "default"
+            }
+        },
+        {
+            "GroupVersionResource": {
+                "group": "",
+                "version": "v1",
+                "resource": "namespaces"
+            },
+            "Metadata": {
+                "name": "bar",
+                "namespace": "default"
+            }
+        },
+        {
+            "GroupVersionResource": {
+                "group": "",
+                "version": "v1",
+                "resource": "namespaces"
             },
             "Metadata": {
                 "name": "baz",

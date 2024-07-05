@@ -20,3 +20,7 @@ data "k8scrd_configmap_v1" "foo" {
     namespace = "default"
   }
 }
+
+data "k8scrd_namespace_v1" "foo" {
+  metadata = { name = "foo" }
+}
