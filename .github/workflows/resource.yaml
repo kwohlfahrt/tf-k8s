@@ -1,27 +1,27 @@
 name: Build Resource Provider
 
 on:
-  release:
-    types: [created, edited]
   push:
     branches: [main]
+    # Draft releases don't trigger actions, so create releases in the workflow
+    # from tag events.
+    tags: [resource-*]
   pull_request: ~
 
 jobs:
   get-providers:
-    if: ${{ !github.event.release || startswith(github.event.release.tag_name, 'resource-') }}
+    if: ${{ github.event.pull_request || startswith(github.event.ref, 'refs/tags/resource-') }}
     runs-on: ubuntu-latest
     outputs:
       providers: ${{ steps.list-providers.outputs.keys || steps.tag-provider.outputs.keys }}
     steps:
       - uses: actions/checkout@v4
       - id: tag-provider
-        if: github.event.release
+        if: startswith(github.event.ref, 'refs/tags/')
         run: |
-          echo "${{ github.event.release.tag_name }}" \
-            | sed -nr 's/^resource-([a-z]+)-[0-9.]+$/keys=["\1"]/p' >> $GITHUB_OUTPUT
+          echo "${{ github.ref_name }}" | sed -nr 's/^resource-([a-z.]+)-v.*$/keys=["\1"]/p; t; q1' >> $GITHUB_OUTPUT
       - id: list-providers
-        if: ${{ !github.event.release }}
+        if: ${{ !startswith(github.event.ref, 'refs/tags/') }}
         run: |
           echo 'keys<<EOF' >> $GITHUB_OUTPUT
           ls internal/provider/crd/versions \
@@ -59,21 +59,57 @@ jobs:
       - name: configure provider
         run: |
           API_GROUPS=$(yq -o json '.apiGroups[]' < internal/provider/crd/versions/${PROVIDER}.yaml)
-          sed -i -e "1 s|example\\.com$|$(echo ${API_GROUPS})|" internal/provider/crd/provider.go
+          sed -i -e "1 {s|example\\.com$|$(echo ${API_GROUPS})|; t; q1}" internal/provider/crd/provider.go
 
       - name: go generate
         run: |
           go install ./cmd/openapi
           go generate -x ./internal/provider/crd/...
 
+      - name: upload generated code
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.provider }}-crd.go
+          path: internal/provider/crd/crd.go
+
       - name: go test
         run: |
           go test ./...
 
+  build:
+    if: startswith(github.event.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    needs: [get-providers, test]
+    strategy:
+      matrix:
+        provider: ${{ fromJson(needs.get-providers.outputs.providers) }}
+        os: ["darwin", "linux", "windows"]
+        arch: ["amd64", "arm64", "riscv64"]
+        exclude:
+          - os: darwin
+            arch: riscv64
+          - os: windows
+            arch: riscv64
+    env:
+        PROVIDER: ${{ matrix.provider }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: download generated code
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.provider }}-crd.go
+          path: internal/provider/crd
+
       - name: go build
         id: build
         run: |
-          PROVIDER_NAME=terraform-provider-k8s-$(echo $PROVIDER | sed -e 's/\./-/')
+          export GOOS=${{ matrix.os }}
+          export GOARCH=${{ matrix.arch }}
+          PROVIDER_NAME=terraform-provider-k8s-$(echo $PROVIDER | sed -e 's/\./-/')_${GOOS}_${GOARCH}
           echo provider-name=$PROVIDER_NAME >> $GITHUB_OUTPUT
           go build -o $PROVIDER_NAME ./cmd/provider
 
@@ -83,12 +119,24 @@ jobs:
           path: ${{ steps.build.outputs.provider-name }}
 
   publish:
-    if: github.event.release != null
+    if: startswith(github.event.ref, 'refs/tags/')
     runs-on: ubuntu-latest
-    needs: [test]
+    needs: [build]
+    permissions:
+      contents: write
     steps:
+      - name: parse tag
+        id: meta
+        run: |
+          echo "${{ github.ref_name }}" \
+            | sed -nr 's/^resource-([a-z.]+)-(v.*)$/name=\1\nversion=\2/p; t; q1' >> $GITHUB_OUTPUT
       - uses: actions/download-artifact@v4
-      - uses: softprops/action-gh-release@2
         with:
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ steps.meta.outputs.name }} ${{ steps.meta.outputs.version }}
+          draft: true
+          fail_on_unmatched_files: true
           files: |
             terraform-provider-k8s-*
