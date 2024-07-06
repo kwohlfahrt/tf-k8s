@@ -24,6 +24,11 @@
             "Name": "k8scrd_namespace_v1.baz",
             "Path": "metadata.name",
             "Value": "baz"
+        },
+        {
+            "Name": "k8scrd_clusterrole_rbac_authorization_k8s_io_v1.bar",
+            "Path": "rules.0.verbs.0",
+            "Value": "get"
         }
     ],
     "Resources": [
@@ -78,6 +83,16 @@
             },
             "Metadata": {
                 "name": "baz"
+            }
+        },
+        {
+            "GroupVersionResource": {
+                "group": "rbac.authorization.k8s.io",
+                "version": "v1",
+                "resource": "clusterroles"
+            },
+            "Metadata": {
+                "name": "bar"
             }
         }
     ]
