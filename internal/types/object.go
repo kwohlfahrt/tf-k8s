@@ -244,14 +244,21 @@ func OpenApiToTfType(root *spec3.OpenAPI, openapi spec.Schema, path []string) (a
 		}
 		return OpenApiToTfType(root, *schema, path)
 	}
-	if len(openapi.Type) == 0 && len(openapi.AllOf) == 1 {
-		return OpenApiToTfType(root, openapi.AllOf[0], path)
+	if len(openapi.Type) == 0 {
+		switch {
+		case len(openapi.AllOf) == 1:
+			return OpenApiToTfType(root, openapi.AllOf[0], path)
+		case len(openapi.OneOf) == 1:
+			return OpenApiToTfType(root, openapi.OneOf[0], path)
+		case len(openapi.OneOf) > 1:
+			return UnionFromOpenApi(root, openapi, path)
+		default:
+			return nil, fmt.Errorf("expected concrete or union type at %s", strings.Join(path, ""))
+		}
 	}
 	var ty string
 	if len(openapi.Type) == 1 {
 		ty = openapi.Type[0]
-	} else if isPrimitive(openapi) {
-		ty = "string"
 	} else {
 		return nil, fmt.Errorf("expected exactly one type at %s", strings.Join(path, ""))
 	}
@@ -271,6 +278,8 @@ func OpenApiToTfType(root *spec3.OpenAPI, openapi spec.Schema, path []string) (a
 		return basetypes.Int64Type{}, nil
 	case "boolean":
 		return basetypes.BoolType{}, nil
+	case "number":
+		return basetypes.NumberType{}, nil
 	default:
 		return nil, fmt.Errorf("unrecognized type at %s: %s", strings.Join(path, ""), ty)
 	}
