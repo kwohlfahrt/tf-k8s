@@ -66,7 +66,9 @@ const fieldManager string = "tofu-k8scrd"
 func (c *crdResource) Create(ctx context.Context, req tfresource.CreateRequest, resp *tfresource.CreateResponse) {
 	var name, namespace string
 	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("metadata").AtName("name"), &name)...)
-	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("metadata").AtName("namespace"), &namespace)...)
+	if c.typeInfo.Namespaced {
+		resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("metadata").AtName("namespace"), &namespace)...)
+	}
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -81,8 +83,7 @@ func (c *crdResource) Create(ctx context.Context, req tfresource.CreateRequest, 
 	// conflict fail if it was created by a different tool, but if we created it
 	// and forgot, this will silently adopt the object. We could generate a
 	// unique `FieldManager` ID per resource, and persist it in the TF state.
-	obj, err := c.client.Resource(c.typeInfo.GroupVersionResource()).Namespace(namespace).
-		Apply(ctx, name, obj, metav1.ApplyOptions{FieldManager: fieldManager})
+	obj, err := c.typeInfo.Interface(c.client, namespace).Apply(ctx, name, obj, metav1.ApplyOptions{FieldManager: fieldManager})
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to create resource", err.Error())
 		return
@@ -99,13 +100,14 @@ func (c *crdResource) Create(ctx context.Context, req tfresource.CreateRequest, 
 func (c *crdResource) Read(ctx context.Context, req tfresource.ReadRequest, resp *tfresource.ReadResponse) {
 	var name, namespace string
 	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("metadata").AtName("name"), &name)...)
-	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("metadata").AtName("namespace"), &namespace)...)
+	if c.typeInfo.Namespaced {
+		resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("metadata").AtName("namespace"), &namespace)...)
+	}
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	obj, err := c.client.Resource(c.typeInfo.GroupVersionResource()).Namespace(namespace).
-		Get(ctx, name, metav1.GetOptions{})
+	obj, err := c.typeInfo.Interface(c.client, namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsGone(err) || errors.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -126,7 +128,9 @@ func (c *crdResource) Read(ctx context.Context, req tfresource.ReadRequest, resp
 func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, resp *tfresource.UpdateResponse) {
 	var name, namespace string
 	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("metadata").AtName("name"), &name)...)
-	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("metadata").AtName("namespace"), &namespace)...)
+	if c.typeInfo.Namespaced {
+		resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("metadata").AtName("namespace"), &namespace)...)
+	}
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -139,8 +143,7 @@ func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, 
 
 	// TODO: Validate that the object already exists. This will silently create
 	// the object if it does not already exist.
-	obj, err := c.client.Resource(c.typeInfo.GroupVersionResource()).Namespace(namespace).
-		Apply(ctx, name, obj, metav1.ApplyOptions{FieldManager: fieldManager})
+	obj, err := c.typeInfo.Interface(c.client, namespace).Apply(ctx, name, obj, metav1.ApplyOptions{FieldManager: fieldManager})
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to create resource", err.Error())
 		return
@@ -157,14 +160,15 @@ func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, 
 func (c *crdResource) Delete(ctx context.Context, req tfresource.DeleteRequest, resp *tfresource.DeleteResponse) {
 	var name, namespace string
 	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("metadata").AtName("name"), &name)...)
-	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("metadata").AtName("namespace"), &namespace)...)
+	if c.typeInfo.Namespaced {
+		resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("metadata").AtName("namespace"), &namespace)...)
+	}
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	err := c.client.Resource(c.typeInfo.GroupVersionResource()).Namespace(namespace).
-		Delete(ctx, name, metav1.DeleteOptions{})
-	if err != nil {
+	err := c.typeInfo.Interface(c.client, namespace).Delete(ctx, name, metav1.DeleteOptions{})
+	if err != nil && !errors.IsNotFound(err) {
 		resp.Diagnostics.AddError("Unable to delete resource", err.Error())
 		return
 	}

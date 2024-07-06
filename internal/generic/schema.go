@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types"
 	runtimeschema "k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 )
 
 type TypeInfo struct {
@@ -38,6 +39,15 @@ func (t TypeInfo) Codegen(builder io.StringWriter) {
 	builder.WriteString("Schema: ")
 	t.Schema.Codegen(builder)
 	builder.WriteString("}")
+}
+
+func (t TypeInfo) Interface(client *dynamic.DynamicClient, namespace string) dynamic.ResourceInterface {
+	namespaceable := client.Resource(t.GroupVersionResource())
+	resource := namespaceable.(dynamic.ResourceInterface)
+	if t.Namespaced {
+		resource = namespaceable.Namespace(namespace)
+	}
+	return resource
 }
 
 func OpenApiToTfSchema(ctx context.Context, customType types.KubernetesObjectType) (*schema.Schema, error) {
