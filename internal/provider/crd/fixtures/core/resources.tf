@@ -75,3 +75,10 @@ import {
   to = k8scrd_namespace_v1.baz
   id = "baz"
 }
+
+resource "k8scrd_clusterrole_rbac_authorization_k8s_io_v1" "bar" {
+  metadata = { name = "bar" }
+  rules = [
+    { api_groups = [""], resources = ["pods"], verbs = ["get", "list", "watch"] },
+  ]
+}
