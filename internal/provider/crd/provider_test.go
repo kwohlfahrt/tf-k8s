@@ -12,10 +12,23 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
-func checkExists(client *dynamic.DynamicClient, gvr metav1.GroupVersionResource, meta metav1.ObjectMeta, exists bool) func(*terraform.State) error {
+func checkExists(client *dynamic.DynamicClient, gvr metav1.GroupVersionResource, meta metav1.ObjectMeta) func(*terraform.State) error {
 	return func(*terraform.State) error {
 		schemaGvr := runtimeschema.GroupVersionResource{Group: gvr.Group, Version: gvr.Version, Resource: gvr.Resource}
 		_, err := client.Resource(schemaGvr).Namespace(meta.Namespace).
+			Get(context.TODO(), meta.Name, metav1.GetOptions{})
+
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+}
+
+func checkNotExists(client *dynamic.DynamicClient, gvr metav1.GroupVersionResource, meta metav1.ObjectMeta) func(*terraform.State) error {
+	return func(*terraform.State) error {
+		schemaGvr := runtimeschema.GroupVersionResource{Group: gvr.Group, Version: gvr.Version, Resource: gvr.Resource}
+		obj, err := client.Resource(schemaGvr).Namespace(meta.Namespace).
 			Get(context.TODO(), meta.Name, metav1.GetOptions{})
 
 		var id string
@@ -27,16 +40,12 @@ func checkExists(client *dynamic.DynamicClient, gvr metav1.GroupVersionResource,
 
 		if err != nil {
 			if k8serrors.IsGone(err) || k8serrors.IsNotFound(err) {
-				if exists {
-					return fmt.Errorf("Resource '%s' does not exist", id)
-				}
-			} else {
-				return err
+				return nil
 			}
-		} else {
-			if !exists {
-				return fmt.Errorf("Resource '%s' still exists", id)
-			}
+			return err
+		}
+		if obj.GetDeletionTimestamp() == nil {
+			return fmt.Errorf("Resource '%s' still exists", id)
 		}
 		return nil
 	}
@@ -62,7 +71,7 @@ func makeChecks(client *dynamic.DynamicClient, spec checkSpec) resource.TestChec
 	checks := make([]resource.TestCheckFunc, 0, len(spec.Resources)+len(spec.Properties))
 
 	for _, resource := range spec.Resources {
-		check := checkExists(client, resource.GroupVersionResource, resource.Metadata, true)
+		check := checkExists(client, resource.GroupVersionResource, resource.Metadata)
 		checks = append(checks, check)
 	}
 	for _, property := range spec.Properties {
@@ -77,7 +86,7 @@ func makeDestroyChecks(client *dynamic.DynamicClient, resources []checkResource)
 	checks := make([]resource.TestCheckFunc, 0, len(resources))
 
 	for _, resource := range resources {
-		check := checkExists(client, resource.GroupVersionResource, resource.Metadata, false)
+		check := checkNotExists(client, resource.GroupVersionResource, resource.Metadata)
 		checks = append(checks, check)
 	}
 

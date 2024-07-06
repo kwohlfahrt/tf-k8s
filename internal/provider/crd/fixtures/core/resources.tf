@@ -62,3 +62,16 @@ import {
   to = k8scrd_deployment_apps_v1.baz
   id = "default/baz"
 }
+
+resource "k8scrd_namespace_v1" "bar" {
+  metadata = { name = "bar" }
+}
+
+resource "k8scrd_namespace_v1" "baz" {
+  metadata = { name = "baz" }
+}
+
+import {
+  to = k8scrd_namespace_v1.baz
+  id = "baz"
+}

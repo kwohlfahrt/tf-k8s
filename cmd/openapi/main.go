@@ -143,13 +143,17 @@ func main() {
 			delete(metaTyp.AttrTypes, "managed_fields")
 			delete(metaTyp.AttrTypes, "generation")
 			delete(metaTyp.AttrTypes, "resource_version")
+			if !resource.Namespaced {
+				delete(metaTyp.AttrTypes, "namespace")
+			}
 
 			info := generic.TypeInfo{
-				Group:    gv.Group,
-				Version:  gv.Version,
-				Kind:     resource.Kind,
-				Resource: resource.Name,
-				Schema:   objectTyp,
+				Group:      gv.Group,
+				Version:    gv.Version,
+				Kind:       resource.Kind,
+				Resource:   resource.Name,
+				Namespaced: resource.Namespaced,
+				Schema:     objectTyp,
 			}
 			info.Codegen(file)
 			file.WriteString(", ")

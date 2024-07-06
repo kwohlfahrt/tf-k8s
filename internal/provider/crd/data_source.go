@@ -78,13 +78,14 @@ func (c *crdDataSource) Schema(ctx context.Context, req datasource.SchemaRequest
 func (c *crdDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var name, namespace string
 	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("metadata").AtName("name"), &name)...)
-	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("metadata").AtName("namespace"), &namespace)...)
+	if c.typeInfo.Namespaced {
+		resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("metadata").AtName("namespace"), &namespace)...)
+	}
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	obj, err := c.client.Resource(c.typeInfo.GroupVersionResource()).Namespace(namespace).
-		Get(ctx, name, metav1.GetOptions{})
+	obj, err := c.typeInfo.Interface(c.client, namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsGone(err) || errors.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)

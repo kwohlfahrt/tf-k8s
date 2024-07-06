@@ -9,6 +9,11 @@
             "Name": "data.k8scrd_configmap_v1.foo",
             "Path": "data.foo.txt",
             "Value": "hello, world!\n"
+        },
+        {
+            "Name": "data.k8scrd_namespace_v1.foo",
+            "Path": "metadata.name",
+            "Value": "foo"
         }
     ]
 }
