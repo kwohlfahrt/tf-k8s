@@ -172,6 +172,8 @@ func (c *crdResource) Delete(ctx context.Context, req tfresource.DeleteRequest, 
 		resp.Diagnostics.AddError("Unable to delete resource", err.Error())
 		return
 	}
+	// TODO: Should we wait for the resource to be gone? All of the watch utils
+	// seem to assume a controller setup, with informers/caches/etc.
 }
 
 func (c *crdResource) ImportState(ctx context.Context, req tfresource.ImportStateRequest, resp *tfresource.ImportStateResponse) {

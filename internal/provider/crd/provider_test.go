@@ -28,7 +28,7 @@ func checkExists(client *dynamic.DynamicClient, gvr metav1.GroupVersionResource,
 func checkNotExists(client *dynamic.DynamicClient, gvr metav1.GroupVersionResource, meta metav1.ObjectMeta) func(*terraform.State) error {
 	return func(*terraform.State) error {
 		schemaGvr := runtimeschema.GroupVersionResource{Group: gvr.Group, Version: gvr.Version, Resource: gvr.Resource}
-		_, err := client.Resource(schemaGvr).Namespace(meta.Namespace).
+		obj, err := client.Resource(schemaGvr).Namespace(meta.Namespace).
 			Get(context.TODO(), meta.Name, metav1.GetOptions{})
 
 		var id string
@@ -44,7 +44,10 @@ func checkNotExists(client *dynamic.DynamicClient, gvr metav1.GroupVersionResour
 			}
 			return err
 		}
-		return fmt.Errorf("Resource '%s' still exists", id)
+		if obj.GetDeletionTimestamp() == nil {
+			return fmt.Errorf("Resource '%s' still exists", id)
+		}
+		return nil
 	}
 }
 
