@@ -73,7 +73,7 @@ jobs:
 
       - name: go test
         run: |
-          go test ./...
+          go test -v $(go list -f '{{ join .Deps "\n" }}' ./cmd/provider | grep github.com/kwohlfahrt/terraform-provider-k8scrd)
 
   build:
     if: startswith(github.event.ref, 'refs/tags/')

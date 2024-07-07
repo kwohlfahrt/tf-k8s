@@ -1,0 +1,80 @@
+name: Build Function Provider
+
+on:
+  push:
+    branches: [main]
+    # Draft releases don't trigger actions, so create releases in the workflow
+    # from tag events.
+    tags: [function-*]
+  pull_request: ~
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+        TF_ACC: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: go test
+        run: |
+          go test -v $(go list -f '{{ join .Deps "\n" }}' ./cmd/function | grep github.com/kwohlfahrt/terraform-provider-k8scrd)
+
+  build:
+    if: startswith(github.event.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    needs: [test]
+    strategy:
+      matrix:
+        os: ["darwin", "linux", "windows"]
+        arch: ["amd64", "arm64", "riscv64"]
+        exclude:
+          - os: darwin
+            arch: riscv64
+          - os: windows
+            arch: riscv64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: go build
+        id: build
+        run: |
+          export GOOS=${{ matrix.os }}
+          export GOARCH=${{ matrix.arch }}
+          PROVIDER_NAME=terraform-provider-k8s-function_${GOOS}_${GOARCH}
+          echo provider-name=$PROVIDER_NAME >> $GITHUB_OUTPUT
+          go build -o $PROVIDER_NAME ./cmd/function
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.build.outputs.provider-name }}
+          path: ${{ steps.build.outputs.provider-name }}
+
+  publish:
+    if: startswith(github.event.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    needs: [build]
+    permissions:
+      contents: write
+    steps:
+      - name: parse tag
+        id: meta
+        run: |
+          echo "${{ github.ref_name }}" \
+            | sed -nr 's/^(function)-(v.*)$/name=\1\nversion=\2/p; t; q1' >> $GITHUB_OUTPUT
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ steps.meta.outputs.name }} ${{ steps.meta.outputs.version }}
+          draft: true
+          fail_on_unmatched_files: true
+          files: |
+            terraform-provider-k8s-*
