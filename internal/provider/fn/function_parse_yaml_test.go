@@ -67,7 +67,7 @@ func TestParseYaml(t *testing.T) {
 								knownvalue.ObjectPartial(map[string]knownvalue.Check{
 									"api_version": knownvalue.StringExact("cert-manager.io/v1"),
 									"kind":        knownvalue.StringExact("Certificate"),
-									"metadata": knownvalue.ObjectExact(map[string]knownvalue.Check{
+									"metadata": knownvalue.ObjectPartial(map[string]knownvalue.Check{
 										"name": knownvalue.StringExact("bar"),
 									}),
 									"spec": knownvalue.ObjectPartial(map[string]knownvalue.Check{

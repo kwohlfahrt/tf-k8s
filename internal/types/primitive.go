@@ -214,6 +214,8 @@ func dynamicPrimitiveFromUnstructured(ctx context.Context, path path.Path, val i
 		return basetypes.NewInt64Value(val), nil
 	case bool:
 		return basetypes.NewBoolValue(val), nil
+	case nil:
+		return basetypes.NewDynamicNull(), nil
 	}
 	return nil, diag.Diagnostics{diag.NewAttributeErrorDiagnostic(
 		path, "Unimplemented value type",
