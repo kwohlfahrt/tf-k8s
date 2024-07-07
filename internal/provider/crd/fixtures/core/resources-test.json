@@ -11,6 +11,11 @@
             "Value": "0"
         },
         {
+            "Name": "k8scrd_deployment_apps_v1.bar",
+            "Path": "spec.strategy.rolling_update.max_unavailable",
+            "Value": "1"
+        },
+        {
             "Name": "k8scrd_deployment_apps_v1.baz",
             "Path": "spec.replicas",
             "Value": "0"

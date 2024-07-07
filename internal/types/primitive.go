@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math/big"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -12,7 +13,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
-	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 func primitiveSchemaType(_ context.Context, attr attr.Type, required bool) (schema.Attribute, error) {
@@ -144,6 +144,10 @@ func primitiveToUnstructured(ctx context.Context, path path.Path, val attr.Value
 	case basetypes.BoolValuable:
 		boolVal, diags := val.ToBoolValue(ctx)
 		return boolVal.ValueBool(), diags
+	case basetypes.NumberValuable:
+		numberVal, diags := val.ToNumberValue(ctx)
+		float, _ := numberVal.ValueBigFloat().Float64()
+		return float, diags
 	default:
 		return nil, diag.Diagnostics{diag.NewAttributeErrorDiagnostic(
 			path, "Unimplemented value type",
@@ -178,6 +182,14 @@ func primitiveFromUnstructured(ctx context.Context, path path.Path, typ attr.Typ
 			)}
 		}
 		return typ.ValueFromBool(ctx, basetypes.NewBoolValue(boolVal))
+	case basetypes.NumberTypable:
+		floatVal, ok := val.(float64)
+		if !ok {
+			return nil, []diag.Diagnostic{diag.NewAttributeErrorDiagnostic(
+				path, "Unexpected value", fmt.Sprintf("Expected float64, got %T", val),
+			)}
+		}
+		return typ.ValueFromNumber(ctx, basetypes.NewNumberValue(big.NewFloat(floatVal)))
 	default:
 		return nil, diag.Diagnostics{diag.NewAttributeErrorDiagnostic(
 			path, "Unimplemented value type",
@@ -196,6 +208,8 @@ func dynamicPrimitiveFromUnstructured(ctx context.Context, path path.Path, val i
 	switch val := val.(type) {
 	case string:
 		return basetypes.NewStringValue(val), nil
+	case float64:
+		return basetypes.NewFloat64Value(val), nil
 	case int64:
 		return basetypes.NewInt64Value(val), nil
 	case bool:
@@ -248,31 +262,10 @@ func primitiveCodegen(attr interface{}, builder io.StringWriter) error {
 		_, err = builder.WriteString("basetypes.Int64Type{}")
 	case basetypes.BoolType:
 		_, err = builder.WriteString("basetypes.BoolType{}")
+	case basetypes.NumberType:
+		_, err = builder.WriteString("basetypes.NumberType{}")
 	default:
 		err = fmt.Errorf("no codegen for type %T", attr)
 	}
 	return err
-}
-
-func isPrimitive(openapi spec.Schema) bool {
-	if len(openapi.Type) > 0 {
-		for _, typ := range openapi.Type {
-			switch typ {
-			case "integer", "number", "string":
-				continue
-			default:
-				return false
-			}
-		}
-		return true
-	}
-	if len(openapi.OneOf) > 0 {
-		for _, typ := range openapi.OneOf {
-			if !isPrimitive(typ) {
-				return false
-			}
-		}
-		return true
-	}
-	return false
 }
