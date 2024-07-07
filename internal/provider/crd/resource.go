@@ -177,7 +177,7 @@ func (c *crdResource) Delete(ctx context.Context, req tfresource.DeleteRequest, 
 }
 
 func (c *crdResource) ImportState(ctx context.Context, req tfresource.ImportStateRequest, resp *tfresource.ImportStateResponse) {
-	if strings.Contains(req.ID, "/") {
+	if c.typeInfo.Namespaced {
 		components := strings.SplitN(req.ID, "/", 2)
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("metadata").AtName("namespace"), components[0])...)
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("metadata").AtName("name"), components[1])...)
