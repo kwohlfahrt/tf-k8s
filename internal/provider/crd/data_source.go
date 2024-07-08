@@ -25,7 +25,7 @@ func (c *crdDataSource) Configure(ctx context.Context, req datasource.ConfigureR
 		return
 	}
 
-	client, ok := req.ProviderData.(*dynamic.DynamicClient)
+	clients, ok := req.ProviderData.(Clients)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Provider data type",
@@ -35,7 +35,7 @@ func (c *crdDataSource) Configure(ctx context.Context, req datasource.ConfigureR
 		return
 	}
 
-	c.client = client
+	c.client = clients.dynamic
 }
 
 func NewDataSource(typeInfo generic.TypeInfo) datasource.DataSource {
