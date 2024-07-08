@@ -70,7 +70,10 @@ import {
 }
 
 resource "k8scrd_namespace_v1" "bar" {
-  metadata = { name = "bar" }
+  metadata = {
+    name   = "bar"
+    labels = { "bar" = "bar" }
+  }
 }
 
 resource "k8scrd_namespace_v1" "baz" {

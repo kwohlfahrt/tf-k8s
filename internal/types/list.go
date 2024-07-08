@@ -10,7 +10,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"k8s.io/kube-openapi/pkg/spec3"
@@ -115,16 +114,14 @@ func (t KubernetesListType) SchemaType(ctx context.Context, required bool) (sche
 				Attributes: attributes,
 				CustomType: objectElem,
 			},
-			PlanModifiers: []planmodifier.List{makeListPlanModifier()},
 		}, nil
 	} else {
 		return schema.ListAttribute{
-			Required:      required,
-			Optional:      !required,
-			Computed:      !required,
-			CustomType:    t,
-			ElementType:   elem,
-			PlanModifiers: []planmodifier.List{makeListPlanModifier()},
+			Required:    required,
+			Optional:    !required,
+			Computed:    !required,
+			CustomType:  t,
+			ElementType: elem,
 		}, nil
 	}
 }
@@ -199,32 +196,3 @@ func (v KubernetesListValue) Type(ctx context.Context) attr.Type {
 
 var _ basetypes.ListValuable = KubernetesListValue{}
 var _ KubernetesValue = KubernetesListValue{}
-
-type listPlanModifier struct{}
-
-func (o listPlanModifier) Description(context.Context) string {
-	return ""
-}
-
-func (o listPlanModifier) MarkdownDescription(context.Context) string {
-	return ""
-}
-
-func (o listPlanModifier) PlanModifyList(ctx context.Context, req planmodifier.ListRequest, resp *planmodifier.ListResponse) {
-	if req.State.Raw.IsNull() {
-		// Create phase, keep null values
-		return
-	}
-	if !req.PlanValue.IsUnknown() {
-		return
-	}
-	if req.ConfigValue.IsUnknown() {
-		return
-	}
-
-	resp.PlanValue = req.StateValue
-}
-
-func makeListPlanModifier() planmodifier.List {
-	return listPlanModifier{}
-}

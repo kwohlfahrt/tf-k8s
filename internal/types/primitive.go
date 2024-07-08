@@ -10,7 +10,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
@@ -21,116 +20,26 @@ func primitiveSchemaType(_ context.Context, attr attr.Type, required bool) (sche
 	switch attr := attr.(type) {
 	case basetypes.StringType:
 		schemaType = schema.StringAttribute{
-			Required:      required,
-			Optional:      !required,
-			Computed:      !required,
-			PlanModifiers: []planmodifier.String{makeStringPlanModifier()},
+			Required: required,
+			Optional: !required,
+			Computed: !required,
 		}
 	case basetypes.Int64Type:
 		schemaType = schema.Int64Attribute{
-			Required:      required,
-			Optional:      !required,
-			Computed:      !required,
-			PlanModifiers: []planmodifier.Int64{makeInt64PlanModifier()},
+			Required: required,
+			Optional: !required,
+			Computed: !required,
 		}
 	case basetypes.BoolType:
 		schemaType = schema.BoolAttribute{
-			Required:      required,
-			Optional:      !required,
-			Computed:      !required,
-			PlanModifiers: []planmodifier.Bool{makeBoolPlanModifier()},
+			Required: required,
+			Optional: !required,
+			Computed: !required,
 		}
 	default:
 		return nil, fmt.Errorf("no schema for type %T", attr)
 	}
 	return schemaType, nil
-}
-
-type stringPlanModifier struct{}
-
-func (o stringPlanModifier) Description(context.Context) string {
-	return ""
-}
-
-func (o stringPlanModifier) MarkdownDescription(context.Context) string {
-	return ""
-}
-
-func (o stringPlanModifier) PlanModifyString(ctx context.Context, req planmodifier.StringRequest, resp *planmodifier.StringResponse) {
-	if req.State.Raw.IsNull() {
-		// Create phase, keep null values
-		return
-	}
-	if !req.PlanValue.IsUnknown() {
-		return
-	}
-	if req.ConfigValue.IsUnknown() {
-		return
-	}
-
-	resp.PlanValue = req.StateValue
-}
-
-func makeStringPlanModifier() planmodifier.String {
-	return stringPlanModifier{}
-}
-
-type int64PlanModifier struct{}
-
-func (o int64PlanModifier) Description(context.Context) string {
-	return ""
-}
-
-func (o int64PlanModifier) MarkdownDescription(context.Context) string {
-	return ""
-}
-
-func (o int64PlanModifier) PlanModifyInt64(ctx context.Context, req planmodifier.Int64Request, resp *planmodifier.Int64Response) {
-	if req.State.Raw.IsNull() {
-		// Create phase, keep null values
-		return
-	}
-	if !req.PlanValue.IsUnknown() {
-		return
-	}
-	if req.ConfigValue.IsUnknown() {
-		return
-	}
-
-	resp.PlanValue = req.StateValue
-}
-
-func makeInt64PlanModifier() planmodifier.Int64 {
-	return int64PlanModifier{}
-}
-
-type boolPlanModifier struct{}
-
-func (o boolPlanModifier) Description(context.Context) string {
-	return ""
-}
-
-func (o boolPlanModifier) MarkdownDescription(context.Context) string {
-	return ""
-}
-
-func (o boolPlanModifier) PlanModifyBool(ctx context.Context, req planmodifier.BoolRequest, resp *planmodifier.BoolResponse) {
-	if req.State.Raw.IsNull() {
-		// Create phase, keep null values
-		return
-	}
-	if !req.PlanValue.IsUnknown() {
-		return
-	}
-	if req.ConfigValue.IsUnknown() {
-		return
-	}
-
-	resp.PlanValue = req.StateValue
-}
-
-func makeBoolPlanModifier() planmodifier.Bool {
-	return boolPlanModifier{}
 }
 
 func primitiveToUnstructured(ctx context.Context, path path.Path, val attr.Value) (interface{}, diag.Diagnostics) {

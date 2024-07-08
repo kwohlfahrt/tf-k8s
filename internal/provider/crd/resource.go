@@ -10,12 +10,14 @@ import (
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/generic"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	acmetav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/client-go/dynamic"
 )
 
 type crdResource struct {
-	typeInfo generic.TypeInfo
-	client   *dynamic.DynamicClient
+	typeInfo  generic.TypeInfo
+	client    *dynamic.DynamicClient
+	extractor acmetav1.UnstructuredExtractor
 }
 
 func NewResource(typeInfo generic.TypeInfo) tfresource.Resource {
@@ -48,7 +50,7 @@ func (c *crdResource) Configure(ctx context.Context, req tfresource.ConfigureReq
 		return
 	}
 
-	client, ok := req.ProviderData.(*dynamic.DynamicClient)
+	clients, ok := req.ProviderData.(Clients)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Provider data type",
@@ -58,7 +60,8 @@ func (c *crdResource) Configure(ctx context.Context, req tfresource.ConfigureReq
 		return
 	}
 
-	c.client = client
+	c.client = clients.dynamic
+	c.extractor = clients.extractor
 }
 
 const fieldManager string = "tofu-k8scrd"
@@ -89,6 +92,12 @@ func (c *crdResource) Create(ctx context.Context, req tfresource.CreateRequest, 
 		return
 	}
 
+	obj, err = c.extractor.Extract(obj, fieldManager)
+	if err != nil {
+		resp.Diagnostics.AddError("Unable to extract managed fields", err.Error())
+		return
+	}
+
 	state, diags := generic.ObjectToState(ctx, c.typeInfo.Schema, *obj)
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
@@ -114,6 +123,12 @@ func (c *crdResource) Read(ctx context.Context, req tfresource.ReadRequest, resp
 			return
 		}
 		resp.Diagnostics.AddError("Unable to fetch resource", err.Error())
+		return
+	}
+
+	obj, err = c.extractor.Extract(obj, fieldManager)
+	if err != nil {
+		resp.Diagnostics.AddError("Unable to extract managed fields", err.Error())
 		return
 	}
 
@@ -146,6 +161,12 @@ func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, 
 	obj, err := c.typeInfo.Interface(c.client, namespace).Apply(ctx, name, obj, metav1.ApplyOptions{FieldManager: fieldManager})
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to create resource", err.Error())
+		return
+	}
+
+	obj, err = c.extractor.Extract(obj, fieldManager)
+	if err != nil {
+		resp.Diagnostics.AddError("Unable to extract managed fields", err.Error())
 		return
 	}
 
