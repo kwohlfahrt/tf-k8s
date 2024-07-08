@@ -10,7 +10,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"k8s.io/kube-openapi/pkg/spec3"
@@ -115,16 +114,14 @@ func (t KubernetesMapType) SchemaType(ctx context.Context, required bool) (schem
 				Attributes: attributes,
 				CustomType: objectElem,
 			},
-			PlanModifiers: []planmodifier.Map{makeMapPlanModifier()},
 		}, nil
 	} else {
 		return schema.MapAttribute{
-			Required:      required,
-			Optional:      !required,
-			Computed:      !required,
-			CustomType:    t,
-			ElementType:   elem,
-			PlanModifiers: []planmodifier.Map{makeMapPlanModifier()},
+			Required:    required,
+			Optional:    !required,
+			Computed:    !required,
+			CustomType:  t,
+			ElementType: elem,
 		}, nil
 	}
 }
@@ -199,32 +196,3 @@ func (v KubernetesMapValue) Type(ctx context.Context) attr.Type {
 
 var _ basetypes.MapValuable = KubernetesMapValue{}
 var _ KubernetesValue = KubernetesMapValue{}
-
-type mapPlanModifier struct{}
-
-func (o mapPlanModifier) Description(context.Context) string {
-	return ""
-}
-
-func (o mapPlanModifier) MarkdownDescription(context.Context) string {
-	return ""
-}
-
-func (o mapPlanModifier) PlanModifyMap(ctx context.Context, req planmodifier.MapRequest, resp *planmodifier.MapResponse) {
-	if req.State.Raw.IsNull() {
-		// Create phase, keep null values
-		return
-	}
-	if !req.PlanValue.IsUnknown() {
-		return
-	}
-	if req.ConfigValue.IsUnknown() {
-		return
-	}
-
-	resp.PlanValue = req.StateValue
-}
-
-func makeMapPlanModifier() planmodifier.Map {
-	return mapPlanModifier{}
-}

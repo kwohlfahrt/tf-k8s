@@ -10,7 +10,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"k8s.io/kube-openapi/pkg/spec3"
@@ -40,11 +39,10 @@ func (t KubernetesUnionType) Codegen(builder io.StringWriter) {
 
 func (t KubernetesUnionType) SchemaType(ctx context.Context, required bool) (schema.Attribute, error) {
 	return schema.DynamicAttribute{
-		Required:      required,
-		Optional:      !required,
-		Computed:      !required,
-		CustomType:    t,
-		PlanModifiers: []planmodifier.Dynamic{makeUnionPlanModifier()},
+		Required:   required,
+		Optional:   !required,
+		Computed:   !required,
+		CustomType: t,
 	}, nil
 }
 
@@ -161,33 +159,4 @@ func UnionFromOpenApi(root *spec3.OpenAPI, openapis spec.Schema, path []string) 
 		memberTypes = append(memberTypes, memberType)
 	}
 	return KubernetesUnionType{Members: memberTypes}, nil
-}
-
-type unionPlanModifier struct{}
-
-func (o unionPlanModifier) Description(context.Context) string {
-	return ""
-}
-
-func (o unionPlanModifier) MarkdownDescription(context.Context) string {
-	return ""
-}
-
-func (o unionPlanModifier) PlanModifyDynamic(ctx context.Context, req planmodifier.DynamicRequest, resp *planmodifier.DynamicResponse) {
-	if req.State.Raw.IsNull() {
-		// Create phase, keep null values
-		return
-	}
-	if !req.PlanValue.IsUnknown() {
-		return
-	}
-	if req.ConfigValue.IsUnknown() {
-		return
-	}
-
-	resp.PlanValue = req.StateValue
-}
-
-func makeUnionPlanModifier() planmodifier.Dynamic {
-	return unionPlanModifier{}
 }

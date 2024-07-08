@@ -11,7 +11,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	strcase "github.com/stoewer/go-strcase"
@@ -165,12 +164,11 @@ func (t KubernetesObjectType) SchemaType(ctx context.Context, required bool) (sc
 	}
 
 	return schema.SingleNestedAttribute{
-		Required:      required,
-		Optional:      !required,
-		Computed:      !required,
-		Attributes:    attributes,
-		CustomType:    t,
-		PlanModifiers: []planmodifier.Object{makeObjectPlanModifier()},
+		Required:   required,
+		Optional:   !required,
+		Computed:   !required,
+		Attributes: attributes,
+		CustomType: t,
 	}, nil
 }
 func (t KubernetesObjectType) Codegen(builder io.StringWriter) {
@@ -396,32 +394,3 @@ func DynamicObjectFromUnstructured(ctx context.Context, path path.Path, val map[
 
 var _ basetypes.ObjectValuable = KubernetesObjectValue{}
 var _ KubernetesValue = KubernetesObjectValue{}
-
-type objectPlanModifier struct{}
-
-func (o objectPlanModifier) Description(context.Context) string {
-	return ""
-}
-
-func (o objectPlanModifier) MarkdownDescription(context.Context) string {
-	return ""
-}
-
-func (o objectPlanModifier) PlanModifyObject(ctx context.Context, req planmodifier.ObjectRequest, resp *planmodifier.ObjectResponse) {
-	if req.State.Raw.IsNull() {
-		// Create phase, keep null values
-		return
-	}
-	if !req.PlanValue.IsUnknown() {
-		return
-	}
-	if req.ConfigValue.IsUnknown() {
-		return
-	}
-
-	resp.PlanValue = req.StateValue
-}
-
-func makeObjectPlanModifier() planmodifier.Object {
-	return objectPlanModifier{}
-}
