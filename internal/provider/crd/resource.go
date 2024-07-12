@@ -200,6 +200,10 @@ func (c *crdResource) Delete(ctx context.Context, req tfresource.DeleteRequest, 
 func (c *crdResource) ImportState(ctx context.Context, req tfresource.ImportStateRequest, resp *tfresource.ImportStateResponse) {
 	if c.typeInfo.Namespaced {
 		components := strings.SplitN(req.ID, "/", 2)
+		if len(components) != 2 {
+			resp.Diagnostics.AddError("Invalid import ID", fmt.Sprintf("expected 2 components, got %d", len(components)))
+			return
+		}
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("metadata").AtName("namespace"), components[0])...)
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("metadata").AtName("name"), components[1])...)
 	} else {

@@ -22,19 +22,19 @@ func primitiveSchemaType(_ context.Context, attr attr.Type, required bool) (sche
 		schemaType = schema.StringAttribute{
 			Required: required,
 			Optional: !required,
-			Computed: !required,
+			Computed: false,
 		}
 	case basetypes.Int64Type:
 		schemaType = schema.Int64Attribute{
 			Required: required,
 			Optional: !required,
-			Computed: !required,
+			Computed: false,
 		}
 	case basetypes.BoolType:
 		schemaType = schema.BoolAttribute{
 			Required: required,
 			Optional: !required,
-			Computed: !required,
+			Computed: false,
 		}
 	default:
 		return nil, fmt.Errorf("no schema for type %T", attr)

@@ -78,11 +78,5 @@ func OpenApiToTfSchema(ctx context.Context, customType types.KubernetesObjectTyp
 	}
 	attributes["metadata"] = meta
 
-	status, ok := attributes["status"].(schema.SingleNestedAttribute)
-	if ok {
-		status.Computed = true
-		attributes["status"] = status
-	}
-
 	return &schema.Schema{Attributes: attributes}, nil
 }

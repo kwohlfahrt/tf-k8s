@@ -108,7 +108,7 @@ func (t KubernetesListType) SchemaType(ctx context.Context, required bool) (sche
 		return schema.ListNestedAttribute{
 			Required:   required,
 			Optional:   !required,
-			Computed:   !required,
+			Computed:   false,
 			CustomType: t,
 			NestedObject: schema.NestedAttributeObject{
 				Attributes: attributes,
@@ -119,7 +119,7 @@ func (t KubernetesListType) SchemaType(ctx context.Context, required bool) (sche
 		return schema.ListAttribute{
 			Required:    required,
 			Optional:    !required,
-			Computed:    !required,
+			Computed:    false,
 			CustomType:  t,
 			ElementType: elem,
 		}, nil

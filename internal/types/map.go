@@ -108,7 +108,7 @@ func (t KubernetesMapType) SchemaType(ctx context.Context, required bool) (schem
 		return schema.MapNestedAttribute{
 			Required:   required,
 			Optional:   !required,
-			Computed:   !required,
+			Computed:   false,
 			CustomType: t,
 			NestedObject: schema.NestedAttributeObject{
 				Attributes: attributes,
@@ -119,7 +119,7 @@ func (t KubernetesMapType) SchemaType(ctx context.Context, required bool) (schem
 		return schema.MapAttribute{
 			Required:    required,
 			Optional:    !required,
-			Computed:    !required,
+			Computed:    false,
 			CustomType:  t,
 			ElementType: elem,
 		}, nil
