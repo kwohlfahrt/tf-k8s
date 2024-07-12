@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"os"
@@ -13,10 +14,19 @@ import (
 	flag "github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeschema "k8s.io/apimachinery/pkg/runtime/schema"
+	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/openapi3"
 	"k8s.io/kube-openapi/pkg/spec3"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
+
+type openapiConfig struct {
+	ApiGroups []string `json:"apiGroups"`
+	Defaults  map[string]struct {
+		Property string      `json:"property"`
+		Value    interface{} `json:"value"`
+	} `json:"defaults"`
+}
 
 var kubeconfig *string = flag.String("kubeconfig", os.Getenv("KUBECONFIG"), "Kubernetes config file path")
 
@@ -60,16 +70,26 @@ func main() {
 		log.Fatal(err.Error())
 	}
 
-	groups := make(map[string]bool, flag.NArg())
-	for _, arg := range flag.Args() {
-		groups[arg] = true
-	}
-
-	config, err := os.ReadFile(*kubeconfig)
+	configFile, err := os.Open(flag.Arg(0))
 	if err != nil {
 		log.Fatal(err.Error())
 	}
-	discoveryClient, err := provider.MakeDiscoveryClient(config)
+	configReader := utilyaml.NewYAMLToJSONDecoder(bufio.NewReader(configFile))
+	var config openapiConfig
+	if err = configReader.Decode(&config); err != nil {
+		log.Fatal(err)
+	}
+
+	groups := make(map[string]bool, flag.NArg())
+	for _, arg := range config.ApiGroups {
+		groups[arg] = true
+	}
+
+	kubeconfigBytes, err := os.ReadFile(*kubeconfig)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	discoveryClient, err := provider.MakeDiscoveryClient(kubeconfigBytes)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
