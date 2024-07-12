@@ -41,7 +41,7 @@ func (t KubernetesUnionType) SchemaType(ctx context.Context, required bool) (sch
 	return schema.DynamicAttribute{
 		Required:   required,
 		Optional:   !required,
-		Computed:   !required,
+		Computed:   false,
 		CustomType: t,
 	}, nil
 }

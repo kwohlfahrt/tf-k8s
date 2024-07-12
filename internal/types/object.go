@@ -166,7 +166,7 @@ func (t KubernetesObjectType) SchemaType(ctx context.Context, required bool) (sc
 	return schema.SingleNestedAttribute{
 		Required:   required,
 		Optional:   !required,
-		Computed:   !required,
+		Computed:   false,
 		Attributes: attributes,
 		CustomType: t,
 	}, nil
