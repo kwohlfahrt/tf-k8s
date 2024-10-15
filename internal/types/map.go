@@ -35,7 +35,7 @@ func (t KubernetesMapType) String() string {
 
 func (t KubernetesMapType) ValueFromMap(ctx context.Context, in basetypes.MapValue) (basetypes.MapValuable, diag.Diagnostics) {
 	value := KubernetesMapValue{MapValue: in}
-	return value, nil
+	return &value, nil
 }
 
 func (t KubernetesMapType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
@@ -194,5 +194,32 @@ func (v KubernetesMapValue) Type(ctx context.Context) attr.Type {
 	return KubernetesMapType{MapType: basetypes.MapType{ElemType: v.ElementType(ctx)}}
 }
 
+func (v *KubernetesMapValue) FillNulls(ctx context.Context, path path.Path, config interface{}) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	mapConfig, ok := config.(map[string]interface{})
+	if !ok {
+		diags.Append(diag.NewAttributeErrorDiagnostic(
+			path, "Unexpected value type",
+			fmt.Sprintf("Expected map of items, got %T", config),
+		))
+		return diags
+	}
+
+	if v.IsNull() && mapConfig != nil && len(mapConfig) == 0 {
+		v.MapValue, diags = basetypes.NewMapValue(v.ElementType(ctx), map[string]attr.Value{})
+	} else if !v.IsNull() && mapConfig == nil && len(v.Elements()) == 0 {
+		v.MapValue = basetypes.NewMapNull(v.ElementType(ctx))
+	} else {
+		for k, v := range v.Elements() {
+			if kubernetesValue, ok := v.(KubernetesValue); ok {
+				kubernetesValue.FillNulls(ctx, path.AtMapKey(k), mapConfig[k])
+			}
+		}
+	}
+
+	return diags
+}
+
 var _ basetypes.MapValuable = KubernetesMapValue{}
-var _ KubernetesValue = KubernetesMapValue{}
+var _ KubernetesValue = &KubernetesMapValue{}

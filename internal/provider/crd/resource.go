@@ -76,7 +76,7 @@ func (c *crdResource) Create(ctx context.Context, req tfresource.CreateRequest, 
 		return
 	}
 
-	obj, diags := generic.StateToObject(ctx, req.Plan, c.typeInfo)
+	planObj, diags := generic.StateToObject(ctx, req.Plan, c.typeInfo)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -86,7 +86,7 @@ func (c *crdResource) Create(ctx context.Context, req tfresource.CreateRequest, 
 	// conflict fail if it was created by a different tool, but if we created it
 	// and forgot, this will silently adopt the object. We could generate a
 	// unique `FieldManager` ID per resource, and persist it in the TF state.
-	obj, err := c.typeInfo.Interface(c.client, namespace).Apply(ctx, name, obj, metav1.ApplyOptions{FieldManager: fieldManager})
+	obj, err := c.typeInfo.Interface(c.client, namespace).Apply(ctx, name, planObj, metav1.ApplyOptions{FieldManager: fieldManager})
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to create resource", err.Error())
 		return
@@ -99,6 +99,8 @@ func (c *crdResource) Create(ctx context.Context, req tfresource.CreateRequest, 
 	}
 
 	state, diags := generic.ObjectToState(ctx, c.typeInfo.Schema, *obj)
+	state.FillNulls(ctx, path.Empty(), planObj.UnstructuredContent())
+
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return

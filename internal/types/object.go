@@ -51,7 +51,7 @@ func (t KubernetesObjectType) ValueFromObject(ctx context.Context, in basetypes.
 		ObjectValue: in,
 		fieldNames:  t.FieldNames,
 	}
-	return value, nil
+	return &value, nil
 }
 
 func (t KubernetesObjectType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
@@ -290,6 +290,7 @@ type KubernetesValue interface {
 	attr.Value
 
 	ToUnstructured(ctx context.Context, path path.Path) (interface{}, diag.Diagnostics)
+	FillNulls(ctx context.Context, path path.Path, config interface{}) diag.Diagnostics
 }
 
 type KubernetesObjectValue struct {
@@ -392,5 +393,46 @@ func DynamicObjectFromUnstructured(ctx context.Context, path path.Path, val map[
 	return kubernetesObj, diags
 }
 
+func (v *KubernetesObjectValue) FillNulls(ctx context.Context, path path.Path, config interface{}) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	mapConfig, ok := config.(map[string]interface{})
+	if !ok {
+		diags.Append(diag.NewAttributeErrorDiagnostic(
+			path, "Unexpected value type",
+			fmt.Sprintf("Expected map of properties, got %T", config),
+		))
+		return diags
+	}
+
+	typ := v.Type(ctx)
+	objTyp, ok := typ.(KubernetesObjectType)
+	if !ok {
+		diags.Append(diag.NewAttributeErrorDiagnostic(
+			path, "Unexpected value type",
+			fmt.Sprintf("Expected KubernetesObjectType, got %T", typ),
+		))
+	}
+
+	for k, fieldValue := range v.Attributes() {
+		fieldPath := path.AtName(k)
+		fieldName, found := objTyp.FieldNames[k]
+		if !found {
+			diags.Append(diag.NewAttributeErrorDiagnostic(
+				fieldPath, "Unexpected field",
+				"Field does not have a mapping to a Kubernetes property. This is a provider-internal error, please report it!",
+			))
+			continue
+		}
+
+		if kubernetesFieldValue, ok := fieldValue.(KubernetesValue); ok {
+			configValue := mapConfig[fieldName]
+			diags.Append(kubernetesFieldValue.FillNulls(ctx, fieldPath, configValue)...)
+		}
+	}
+
+	return diags
+}
+
 var _ basetypes.ObjectValuable = KubernetesObjectValue{}
-var _ KubernetesValue = KubernetesObjectValue{}
+var _ KubernetesValue = &KubernetesObjectValue{}

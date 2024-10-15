@@ -35,7 +35,7 @@ func (t KubernetesListType) String() string {
 
 func (t KubernetesListType) ValueFromList(ctx context.Context, in basetypes.ListValue) (basetypes.ListValuable, diag.Diagnostics) {
 	value := KubernetesListValue{ListValue: in}
-	return value, nil
+	return &value, nil
 }
 
 func (t KubernetesListType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
@@ -194,5 +194,32 @@ func (v KubernetesListValue) Type(ctx context.Context) attr.Type {
 	return KubernetesListType{ListType: basetypes.ListType{ElemType: v.ElementType(ctx)}}
 }
 
+func (v *KubernetesListValue) FillNulls(ctx context.Context, path path.Path, config interface{}) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	listConfig, ok := config.([]interface{})
+	if !ok {
+		diags.Append(diag.NewAttributeErrorDiagnostic(
+			path, "Unexpected value type",
+			fmt.Sprintf("Expected list of items, got %T", config),
+		))
+		return diags
+	}
+
+	if v.IsNull() && listConfig != nil && len(listConfig) == 0 {
+		v.ListValue, diags = basetypes.NewListValue(v.ElementType(ctx), []attr.Value{})
+	} else if !v.IsNull() && listConfig == nil && len(v.Elements()) == 0 {
+		v.ListValue = basetypes.NewListNull(v.ElementType(ctx))
+	} else {
+		for i, v := range v.Elements() {
+			if kubernetesValue, ok := v.(KubernetesValue); ok {
+				kubernetesValue.FillNulls(ctx, path.AtListIndex(i), listConfig[i])
+			}
+		}
+	}
+
+	return diags
+}
+
 var _ basetypes.ListValuable = KubernetesListValue{}
-var _ KubernetesValue = KubernetesListValue{}
+var _ KubernetesValue = &KubernetesListValue{}

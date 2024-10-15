@@ -29,6 +29,7 @@ resource "k8scrd_deployment_apps_v1" "bar" {
           name  = "foo"
           image = "busybox"
         }]
+        volumes = []
       }
     }
   }

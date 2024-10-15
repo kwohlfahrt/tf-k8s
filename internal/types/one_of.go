@@ -83,7 +83,7 @@ func (t KubernetesUnionType) ValueFromDynamic(ctx context.Context, in basetypes.
 		DynamicValue: in,
 		MemberTypes:  t.Members,
 	}
-	return value, nil
+	return &value, nil
 }
 
 func (t KubernetesUnionType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
@@ -139,6 +139,14 @@ func (v KubernetesUnionValue) ToUnstructured(ctx context.Context, path path.Path
 
 func (v KubernetesUnionValue) Type(context.Context) attr.Type {
 	return KubernetesUnionType{Members: v.MemberTypes}
+}
+
+func (v KubernetesUnionValue) FillNulls(ctx context.Context, path path.Path, config interface{}) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	// TODO
+
+	return diags
 }
 
 var _ basetypes.DynamicValuable = KubernetesUnionValue{}
