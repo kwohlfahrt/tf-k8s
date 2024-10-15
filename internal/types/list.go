@@ -3,7 +3,6 @@ package types
 import (
 	"context"
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -124,19 +123,6 @@ func (t KubernetesListType) SchemaType(ctx context.Context, required bool) (sche
 			ElementType: elem,
 		}, nil
 	}
-}
-
-func (t KubernetesListType) Codegen(builder io.StringWriter) {
-	builder.WriteString("types.KubernetesListType{")
-	builder.WriteString("ListType: basetypes.ListType{")
-	builder.WriteString("ElemType: ")
-	if kubernetesElem, ok := t.ListType.ElemType.(KubernetesType); ok {
-		kubernetesElem.Codegen(builder)
-	} else {
-		primitiveCodegen(t.ListType.ElemType, builder)
-	}
-	builder.WriteString("},")
-	builder.WriteString("}")
 }
 
 func ListFromOpenApi(root *spec3.OpenAPI, openapi spec.Schema, path []string) (KubernetesType, error) {

@@ -3,8 +3,6 @@ package types
 import (
 	"context"
 	"fmt"
-	"io"
-	"strconv"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -23,7 +21,6 @@ type KubernetesType interface {
 
 	SchemaType(ctx context.Context, isRequired bool) (schema.Attribute, error)
 	ValueFromUnstructured(ctx context.Context, path path.Path, obj interface{}) (attr.Value, diag.Diagnostics)
-	Codegen(builder io.StringWriter)
 }
 
 type KubernetesObjectType struct {
@@ -170,34 +167,6 @@ func (t KubernetesObjectType) SchemaType(ctx context.Context, required bool) (sc
 		Attributes: attributes,
 		CustomType: t,
 	}, nil
-}
-func (t KubernetesObjectType) Codegen(builder io.StringWriter) {
-	builder.WriteString("types.KubernetesObjectType{")
-	builder.WriteString("ObjectType: basetypes.ObjectType{")
-	builder.WriteString("AttrTypes: map[string]attr.Type{")
-	for k, attr := range t.ObjectType.AttrTypes {
-		builder.WriteString(strconv.Quote(k))
-		builder.WriteString(": ")
-		if kubernetesAttr, ok := attr.(KubernetesType); ok {
-			kubernetesAttr.Codegen(builder)
-		} else {
-			primitiveCodegen(attr, builder)
-		}
-		builder.WriteString(",")
-	}
-	builder.WriteString("},")
-	builder.WriteString("},")
-	builder.WriteString("RequiredFields: map[string]bool{")
-	for k, v := range t.RequiredFields {
-		builder.WriteString(fmt.Sprintf("%s: %t,", strconv.Quote(k), v))
-	}
-	builder.WriteString("},")
-	builder.WriteString("FieldNames: map[string]string{")
-	for k, v := range t.FieldNames {
-		builder.WriteString(fmt.Sprintf("%s: %s,", strconv.Quote(k), strconv.Quote(v)))
-	}
-	builder.WriteString("},")
-	builder.WriteString("}")
 }
 
 func ObjectFromOpenApi(root *spec3.OpenAPI, openapi spec.Schema, path []string) (KubernetesType, error) {

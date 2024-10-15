@@ -3,7 +3,6 @@ package types
 import (
 	"context"
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -20,21 +19,6 @@ type KubernetesUnionType struct {
 	basetypes.DynamicType
 
 	Members []attr.Type
-}
-
-func (t KubernetesUnionType) Codegen(builder io.StringWriter) {
-	builder.WriteString("types.KubernetesUnionType{")
-	builder.WriteString("Members: []attr.Type{")
-	for _, member := range t.Members {
-		if kubernetesMember, ok := member.(KubernetesType); ok {
-			kubernetesMember.Codegen(builder)
-		} else {
-			primitiveCodegen(member, builder)
-		}
-		builder.WriteString(",")
-	}
-	builder.WriteString("}")
-	builder.WriteString("}")
 }
 
 func (t KubernetesUnionType) SchemaType(ctx context.Context, required bool) (schema.Attribute, error) {

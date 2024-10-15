@@ -3,7 +3,6 @@ package types
 import (
 	"context"
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -124,19 +123,6 @@ func (t KubernetesMapType) SchemaType(ctx context.Context, required bool) (schem
 			ElementType: elem,
 		}, nil
 	}
-}
-
-func (t KubernetesMapType) Codegen(builder io.StringWriter) {
-	builder.WriteString("types.KubernetesMapType{")
-	builder.WriteString("MapType: basetypes.MapType{")
-	builder.WriteString("ElemType: ")
-	if kubernetesElem, ok := t.MapType.ElemType.(KubernetesType); ok {
-		kubernetesElem.Codegen(builder)
-	} else {
-		primitiveCodegen(t.MapType.ElemType, builder)
-	}
-	builder.WriteString("},")
-	builder.WriteString("}")
 }
 
 func MapFromOpenApi(root *spec3.OpenAPI, openapi spec.Schema, path []string) (KubernetesType, error) {
