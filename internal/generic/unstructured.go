@@ -25,7 +25,7 @@ func StateToObject(ctx context.Context, state tfsdk.Plan, typeInfo TypeInfo) (*u
 	if diags.HasError() {
 		return nil, diags
 	}
-	objectValue := value.(types.KubernetesObjectValue)
+	objectValue := value.(*types.KubernetesObjectValue)
 	obj, objDiags := objectValue.ToUnstructured(ctx, path.Empty())
 	diags.Append(objDiags...)
 	if diags.HasError() {

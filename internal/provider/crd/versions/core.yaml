@@ -3,4 +3,8 @@ apiGroups:
   - apps
   - batch
   - rbac.authorization.k8s.io
+defaults:
+  io.k8s.api.core.v1.ObjectFieldSelector:
+    property: apiVersion
+    value: "v1"
 crdSources: []

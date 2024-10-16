@@ -76,7 +76,7 @@ func (c *crdResource) Create(ctx context.Context, req tfresource.CreateRequest, 
 		return
 	}
 
-	obj, diags := generic.StateToObject(ctx, req.Plan, c.typeInfo)
+	planObj, diags := generic.StateToObject(ctx, req.Plan, c.typeInfo)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -86,7 +86,7 @@ func (c *crdResource) Create(ctx context.Context, req tfresource.CreateRequest, 
 	// conflict fail if it was created by a different tool, but if we created it
 	// and forgot, this will silently adopt the object. We could generate a
 	// unique `FieldManager` ID per resource, and persist it in the TF state.
-	obj, err := c.typeInfo.Interface(c.client, namespace).Apply(ctx, name, obj, metav1.ApplyOptions{FieldManager: fieldManager})
+	obj, err := c.typeInfo.Interface(c.client, namespace).Apply(ctx, name, planObj, metav1.ApplyOptions{FieldManager: fieldManager})
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to create resource", err.Error())
 		return
@@ -103,6 +103,13 @@ func (c *crdResource) Create(ctx context.Context, req tfresource.CreateRequest, 
 	if diags.HasError() {
 		return
 	}
+
+	diags = generic.FillNulls(ctx, state, req.Plan)
+	resp.Diagnostics.Append(diags...)
+	if diags.HasError() {
+		return
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
 
@@ -137,6 +144,13 @@ func (c *crdResource) Read(ctx context.Context, req tfresource.ReadRequest, resp
 	if diags.HasError() {
 		return
 	}
+
+	diags = generic.FillNulls(ctx, state, req.State)
+	resp.Diagnostics.Append(diags...)
+	if diags.HasError() {
+		return
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
 
@@ -200,6 +214,10 @@ func (c *crdResource) Delete(ctx context.Context, req tfresource.DeleteRequest, 
 func (c *crdResource) ImportState(ctx context.Context, req tfresource.ImportStateRequest, resp *tfresource.ImportStateResponse) {
 	if c.typeInfo.Namespaced {
 		components := strings.SplitN(req.ID, "/", 2)
+		if len(components) != 2 {
+			resp.Diagnostics.AddError("Invalid import ID", fmt.Sprintf("expected 2 components, got %d", len(components)))
+			return
+		}
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("metadata").AtName("namespace"), components[0])...)
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("metadata").AtName("name"), components[1])...)
 	} else {

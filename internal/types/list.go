@@ -3,7 +3,6 @@ package types
 import (
 	"context"
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -35,7 +34,7 @@ func (t KubernetesListType) String() string {
 
 func (t KubernetesListType) ValueFromList(ctx context.Context, in basetypes.ListValue) (basetypes.ListValuable, diag.Diagnostics) {
 	value := KubernetesListValue{ListValue: in}
-	return value, nil
+	return &value, nil
 }
 
 func (t KubernetesListType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
@@ -108,7 +107,7 @@ func (t KubernetesListType) SchemaType(ctx context.Context, required bool) (sche
 		return schema.ListNestedAttribute{
 			Required:   required,
 			Optional:   !required,
-			Computed:   !required,
+			Computed:   false,
 			CustomType: t,
 			NestedObject: schema.NestedAttributeObject{
 				Attributes: attributes,
@@ -119,24 +118,11 @@ func (t KubernetesListType) SchemaType(ctx context.Context, required bool) (sche
 		return schema.ListAttribute{
 			Required:    required,
 			Optional:    !required,
-			Computed:    !required,
+			Computed:    false,
 			CustomType:  t,
 			ElementType: elem,
 		}, nil
 	}
-}
-
-func (t KubernetesListType) Codegen(builder io.StringWriter) {
-	builder.WriteString("types.KubernetesListType{")
-	builder.WriteString("ListType: basetypes.ListType{")
-	builder.WriteString("ElemType: ")
-	if kubernetesElem, ok := t.ListType.ElemType.(KubernetesType); ok {
-		kubernetesElem.Codegen(builder)
-	} else {
-		primitiveCodegen(t.ListType.ElemType, builder)
-	}
-	builder.WriteString("},")
-	builder.WriteString("}")
 }
 
 func ListFromOpenApi(root *spec3.OpenAPI, openapi spec.Schema, path []string) (KubernetesType, error) {
@@ -194,5 +180,42 @@ func (v KubernetesListValue) Type(ctx context.Context) attr.Type {
 	return KubernetesListType{ListType: basetypes.ListType{ElemType: v.ElementType(ctx)}}
 }
 
+func (v *KubernetesListValue) FillNulls(ctx context.Context, path path.Path, config attr.Value) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	var kubernetesConfig *KubernetesListValue
+	switch config := config.(type) {
+	case basetypes.ListValue:
+		baseConfig, diags := v.Type(ctx).(KubernetesListType).ValueFromList(ctx, config)
+		if diags.HasError() {
+			return diags
+		}
+		kubernetesConfig = baseConfig.(*KubernetesListValue)
+	case *KubernetesListValue:
+		kubernetesConfig = config
+	default:
+		diags.Append(diag.NewAttributeErrorDiagnostic(
+			path, "Unexpected value type",
+			fmt.Sprintf("Expected ListValue, got %T", config),
+		))
+		return diags
+	}
+
+	configElements := kubernetesConfig.Elements()
+	if v.IsNull() && !kubernetesConfig.IsNull() && len(configElements) == 0 {
+		v.ListValue, diags = basetypes.NewListValue(v.ElementType(ctx), []attr.Value{})
+	} else if !v.IsNull() && kubernetesConfig.IsNull() && len(v.Elements()) == 0 {
+		v.ListValue = basetypes.NewListNull(v.ElementType(ctx))
+	} else {
+		for i, v := range v.Elements() {
+			if kubernetesValue, ok := v.(KubernetesValue); ok {
+				kubernetesValue.FillNulls(ctx, path.AtListIndex(i), configElements[i])
+			}
+		}
+	}
+
+	return diags
+}
+
 var _ basetypes.ListValuable = KubernetesListValue{}
-var _ KubernetesValue = KubernetesListValue{}
+var _ KubernetesValue = &KubernetesListValue{}

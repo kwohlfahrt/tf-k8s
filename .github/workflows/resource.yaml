@@ -59,8 +59,7 @@ jobs:
 
       - name: configure provider
         run: |
-          API_GROUPS=$(yq -o json '.apiGroups[]' < internal/provider/crd/versions/${PROVIDER}.yaml)
-          sed -i -e "1 {s|example\\.com$|$(echo ${API_GROUPS})|; t; q1}" internal/provider/crd/provider.go
+          sed -i -e "1 {s|example\\.com\\.yaml$|${PROVIDER}.yaml|; t; q1}" internal/provider/crd/provider.go
 
       - name: go generate
         run: |

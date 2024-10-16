@@ -3,7 +3,6 @@ package types
 import (
 	"context"
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -22,26 +21,11 @@ type KubernetesUnionType struct {
 	Members []attr.Type
 }
 
-func (t KubernetesUnionType) Codegen(builder io.StringWriter) {
-	builder.WriteString("types.KubernetesUnionType{")
-	builder.WriteString("Members: []attr.Type{")
-	for _, member := range t.Members {
-		if kubernetesMember, ok := member.(KubernetesType); ok {
-			kubernetesMember.Codegen(builder)
-		} else {
-			primitiveCodegen(member, builder)
-		}
-		builder.WriteString(",")
-	}
-	builder.WriteString("}")
-	builder.WriteString("}")
-}
-
 func (t KubernetesUnionType) SchemaType(ctx context.Context, required bool) (schema.Attribute, error) {
 	return schema.DynamicAttribute{
 		Required:   required,
 		Optional:   !required,
-		Computed:   !required,
+		Computed:   false,
 		CustomType: t,
 	}, nil
 }
@@ -83,7 +67,7 @@ func (t KubernetesUnionType) ValueFromDynamic(ctx context.Context, in basetypes.
 		DynamicValue: in,
 		MemberTypes:  t.Members,
 	}
-	return value, nil
+	return &value, nil
 }
 
 func (t KubernetesUnionType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
@@ -139,6 +123,14 @@ func (v KubernetesUnionValue) ToUnstructured(ctx context.Context, path path.Path
 
 func (v KubernetesUnionValue) Type(context.Context) attr.Type {
 	return KubernetesUnionType{Members: v.MemberTypes}
+}
+
+func (v KubernetesUnionValue) FillNulls(ctx context.Context, path path.Path, config attr.Value) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	// TODO
+
+	return diags
 }
 
 var _ basetypes.DynamicValuable = KubernetesUnionValue{}

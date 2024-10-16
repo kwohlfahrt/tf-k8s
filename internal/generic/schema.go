@@ -3,8 +3,6 @@ package generic
 import (
 	"context"
 	"fmt"
-	"io"
-	"strconv"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types"
@@ -27,18 +25,6 @@ func (t TypeInfo) GroupVersionResource() runtimeschema.GroupVersionResource {
 		Resource: t.Resource,
 		Version:  t.Version,
 	}
-}
-
-func (t TypeInfo) Codegen(builder io.StringWriter) {
-	builder.WriteString("{")
-	builder.WriteString(fmt.Sprintf("Group: %s, ", strconv.Quote(t.Group)))
-	builder.WriteString(fmt.Sprintf("Resource: %s, ", strconv.Quote(t.Resource)))
-	builder.WriteString(fmt.Sprintf("Kind: %s, ", strconv.Quote(t.Kind)))
-	builder.WriteString(fmt.Sprintf("Version: %s, ", strconv.Quote(t.Version)))
-	builder.WriteString(fmt.Sprintf("Namespaced: %t, ", t.Namespaced))
-	builder.WriteString("Schema: ")
-	t.Schema.Codegen(builder)
-	builder.WriteString("}")
 }
 
 func (t TypeInfo) Interface(client *dynamic.DynamicClient, namespace string) dynamic.ResourceInterface {
@@ -77,12 +63,6 @@ func OpenApiToTfSchema(ctx context.Context, customType types.KubernetesObjectTyp
 		meta.Attributes[attrName] = attr
 	}
 	attributes["metadata"] = meta
-
-	status, ok := attributes["status"].(schema.SingleNestedAttribute)
-	if ok {
-		status.Computed = true
-		attributes["status"] = status
-	}
 
 	return &schema.Schema{Attributes: attributes}, nil
 }

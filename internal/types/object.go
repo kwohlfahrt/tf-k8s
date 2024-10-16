@@ -3,8 +3,6 @@ package types
 import (
 	"context"
 	"fmt"
-	"io"
-	"strconv"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -23,7 +21,6 @@ type KubernetesType interface {
 
 	SchemaType(ctx context.Context, isRequired bool) (schema.Attribute, error)
 	ValueFromUnstructured(ctx context.Context, path path.Path, obj interface{}) (attr.Value, diag.Diagnostics)
-	Codegen(builder io.StringWriter)
 }
 
 type KubernetesObjectType struct {
@@ -51,7 +48,7 @@ func (t KubernetesObjectType) ValueFromObject(ctx context.Context, in basetypes.
 		ObjectValue: in,
 		fieldNames:  t.FieldNames,
 	}
-	return value, nil
+	return &value, nil
 }
 
 func (t KubernetesObjectType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
@@ -166,38 +163,10 @@ func (t KubernetesObjectType) SchemaType(ctx context.Context, required bool) (sc
 	return schema.SingleNestedAttribute{
 		Required:   required,
 		Optional:   !required,
-		Computed:   !required,
+		Computed:   false,
 		Attributes: attributes,
 		CustomType: t,
 	}, nil
-}
-func (t KubernetesObjectType) Codegen(builder io.StringWriter) {
-	builder.WriteString("types.KubernetesObjectType{")
-	builder.WriteString("ObjectType: basetypes.ObjectType{")
-	builder.WriteString("AttrTypes: map[string]attr.Type{")
-	for k, attr := range t.ObjectType.AttrTypes {
-		builder.WriteString(strconv.Quote(k))
-		builder.WriteString(": ")
-		if kubernetesAttr, ok := attr.(KubernetesType); ok {
-			kubernetesAttr.Codegen(builder)
-		} else {
-			primitiveCodegen(attr, builder)
-		}
-		builder.WriteString(",")
-	}
-	builder.WriteString("},")
-	builder.WriteString("},")
-	builder.WriteString("RequiredFields: map[string]bool{")
-	for k, v := range t.RequiredFields {
-		builder.WriteString(fmt.Sprintf("%s: %t,", strconv.Quote(k), v))
-	}
-	builder.WriteString("},")
-	builder.WriteString("FieldNames: map[string]string{")
-	for k, v := range t.FieldNames {
-		builder.WriteString(fmt.Sprintf("%s: %s,", strconv.Quote(k), strconv.Quote(v)))
-	}
-	builder.WriteString("},")
-	builder.WriteString("}")
 }
 
 func ObjectFromOpenApi(root *spec3.OpenAPI, openapi spec.Schema, path []string) (KubernetesType, error) {
@@ -290,6 +259,7 @@ type KubernetesValue interface {
 	attr.Value
 
 	ToUnstructured(ctx context.Context, path path.Path) (interface{}, diag.Diagnostics)
+	FillNulls(ctx context.Context, path path.Path, config attr.Value) diag.Diagnostics
 }
 
 type KubernetesObjectValue struct {
@@ -392,5 +362,38 @@ func DynamicObjectFromUnstructured(ctx context.Context, path path.Path, val map[
 	return kubernetesObj, diags
 }
 
+func (v *KubernetesObjectValue) FillNulls(ctx context.Context, path path.Path, config attr.Value) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	var kubernetesConfig *KubernetesObjectValue
+	switch config := config.(type) {
+	case basetypes.ObjectValue:
+		baseConfig, diags := v.Type(ctx).(KubernetesObjectType).ValueFromObject(ctx, config)
+		if diags.HasError() {
+			return diags
+		}
+		kubernetesConfig = baseConfig.(*KubernetesObjectValue)
+	case *KubernetesObjectValue:
+		kubernetesConfig = config
+	default:
+		diags.Append(diag.NewAttributeErrorDiagnostic(
+			path, "Unexpected value type",
+			fmt.Sprintf("Expected ObjectValue, got %T", config),
+		))
+		return diags
+	}
+
+	configAttrs := kubernetesConfig.Attributes()
+	for k, fieldValue := range v.Attributes() {
+		fieldPath := path.AtName(k)
+		if kubernetesFieldValue, ok := fieldValue.(KubernetesValue); ok {
+			attr := configAttrs[k]
+			diags.Append(kubernetesFieldValue.FillNulls(ctx, fieldPath, attr)...)
+		}
+	}
+
+	return diags
+}
+
 var _ basetypes.ObjectValuable = KubernetesObjectValue{}
-var _ KubernetesValue = KubernetesObjectValue{}
+var _ KubernetesValue = &KubernetesObjectValue{}

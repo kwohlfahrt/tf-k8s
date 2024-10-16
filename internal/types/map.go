@@ -3,7 +3,6 @@ package types
 import (
 	"context"
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -35,7 +34,7 @@ func (t KubernetesMapType) String() string {
 
 func (t KubernetesMapType) ValueFromMap(ctx context.Context, in basetypes.MapValue) (basetypes.MapValuable, diag.Diagnostics) {
 	value := KubernetesMapValue{MapValue: in}
-	return value, nil
+	return &value, nil
 }
 
 func (t KubernetesMapType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
@@ -108,7 +107,7 @@ func (t KubernetesMapType) SchemaType(ctx context.Context, required bool) (schem
 		return schema.MapNestedAttribute{
 			Required:   required,
 			Optional:   !required,
-			Computed:   !required,
+			Computed:   false,
 			CustomType: t,
 			NestedObject: schema.NestedAttributeObject{
 				Attributes: attributes,
@@ -119,24 +118,11 @@ func (t KubernetesMapType) SchemaType(ctx context.Context, required bool) (schem
 		return schema.MapAttribute{
 			Required:    required,
 			Optional:    !required,
-			Computed:    !required,
+			Computed:    false,
 			CustomType:  t,
 			ElementType: elem,
 		}, nil
 	}
-}
-
-func (t KubernetesMapType) Codegen(builder io.StringWriter) {
-	builder.WriteString("types.KubernetesMapType{")
-	builder.WriteString("MapType: basetypes.MapType{")
-	builder.WriteString("ElemType: ")
-	if kubernetesElem, ok := t.MapType.ElemType.(KubernetesType); ok {
-		kubernetesElem.Codegen(builder)
-	} else {
-		primitiveCodegen(t.MapType.ElemType, builder)
-	}
-	builder.WriteString("},")
-	builder.WriteString("}")
 }
 
 func MapFromOpenApi(root *spec3.OpenAPI, openapi spec.Schema, path []string) (KubernetesType, error) {
@@ -194,5 +180,42 @@ func (v KubernetesMapValue) Type(ctx context.Context) attr.Type {
 	return KubernetesMapType{MapType: basetypes.MapType{ElemType: v.ElementType(ctx)}}
 }
 
+func (v *KubernetesMapValue) FillNulls(ctx context.Context, path path.Path, config attr.Value) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	var kubernetesConfig *KubernetesMapValue
+	switch config := config.(type) {
+	case basetypes.MapValue:
+		baseConfig, diags := v.Type(ctx).(KubernetesMapType).ValueFromMap(ctx, config)
+		if diags.HasError() {
+			return diags
+		}
+		kubernetesConfig = baseConfig.(*KubernetesMapValue)
+	case *KubernetesMapValue:
+		kubernetesConfig = config
+	default:
+		diags.Append(diag.NewAttributeErrorDiagnostic(
+			path, "Unexpected value type",
+			fmt.Sprintf("Expected MapValue, got %T", config),
+		))
+		return diags
+	}
+
+	configElements := kubernetesConfig.Elements()
+	if v.IsNull() && !kubernetesConfig.IsNull() && len(configElements) == 0 {
+		v.MapValue, diags = basetypes.NewMapValue(v.ElementType(ctx), map[string]attr.Value{})
+	} else if !v.IsNull() && kubernetesConfig.IsNull() && len(v.Elements()) == 0 {
+		v.MapValue = basetypes.NewMapNull(v.ElementType(ctx))
+	} else {
+		for k, v := range v.Elements() {
+			if kubernetesValue, ok := v.(KubernetesValue); ok {
+				kubernetesValue.FillNulls(ctx, path.AtMapKey(k), configElements[k])
+			}
+		}
+	}
+
+	return diags
+}
+
 var _ basetypes.MapValuable = KubernetesMapValue{}
-var _ KubernetesValue = KubernetesMapValue{}
+var _ KubernetesValue = &KubernetesMapValue{}
