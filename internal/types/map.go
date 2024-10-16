@@ -180,26 +180,36 @@ func (v KubernetesMapValue) Type(ctx context.Context) attr.Type {
 	return KubernetesMapType{MapType: basetypes.MapType{ElemType: v.ElementType(ctx)}}
 }
 
-func (v *KubernetesMapValue) FillNulls(ctx context.Context, path path.Path, config interface{}) diag.Diagnostics {
+func (v *KubernetesMapValue) FillNulls(ctx context.Context, path path.Path, config attr.Value) diag.Diagnostics {
 	var diags diag.Diagnostics
 
-	mapConfig, ok := config.(map[string]interface{})
-	if !ok {
+	var kubernetesConfig *KubernetesMapValue
+	switch config := config.(type) {
+	case basetypes.MapValue:
+		baseConfig, diags := v.Type(ctx).(KubernetesMapType).ValueFromMap(ctx, config)
+		if diags.HasError() {
+			return diags
+		}
+		kubernetesConfig = baseConfig.(*KubernetesMapValue)
+	case *KubernetesMapValue:
+		kubernetesConfig = config
+	default:
 		diags.Append(diag.NewAttributeErrorDiagnostic(
 			path, "Unexpected value type",
-			fmt.Sprintf("Expected map of items, got %T", config),
+			fmt.Sprintf("Expected MapValue, got %T", config),
 		))
 		return diags
 	}
 
-	if v.IsNull() && mapConfig != nil && len(mapConfig) == 0 {
+	configElements := kubernetesConfig.Elements()
+	if v.IsNull() && !kubernetesConfig.IsNull() && len(configElements) == 0 {
 		v.MapValue, diags = basetypes.NewMapValue(v.ElementType(ctx), map[string]attr.Value{})
-	} else if !v.IsNull() && mapConfig == nil && len(v.Elements()) == 0 {
+	} else if !v.IsNull() && kubernetesConfig.IsNull() && len(v.Elements()) == 0 {
 		v.MapValue = basetypes.NewMapNull(v.ElementType(ctx))
 	} else {
 		for k, v := range v.Elements() {
 			if kubernetesValue, ok := v.(KubernetesValue); ok {
-				kubernetesValue.FillNulls(ctx, path.AtMapKey(k), mapConfig[k])
+				kubernetesValue.FillNulls(ctx, path.AtMapKey(k), configElements[k])
 			}
 		}
 	}

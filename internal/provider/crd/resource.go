@@ -99,12 +99,17 @@ func (c *crdResource) Create(ctx context.Context, req tfresource.CreateRequest, 
 	}
 
 	state, diags := generic.ObjectToState(ctx, c.typeInfo.Schema, *obj)
-	state.FillNulls(ctx, path.Empty(), planObj.UnstructuredContent())
-
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
 	}
+
+	diags = generic.FillNulls(ctx, state, req.Plan)
+	resp.Diagnostics.Append(diags...)
+	if diags.HasError() {
+		return
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
 
@@ -139,6 +144,13 @@ func (c *crdResource) Read(ctx context.Context, req tfresource.ReadRequest, resp
 	if diags.HasError() {
 		return
 	}
+
+	diags = generic.FillNulls(ctx, state, req.State)
+	resp.Diagnostics.Append(diags...)
+	if diags.HasError() {
+		return
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
 

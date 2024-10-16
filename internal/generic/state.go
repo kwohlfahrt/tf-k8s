@@ -6,6 +6,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -26,4 +27,21 @@ func ObjectToState(ctx context.Context, typ types.KubernetesObjectType, obj unst
 	}
 
 	return kubernetesValue, diags
+}
+
+type PlanOrState interface {
+	Get(ctx context.Context, target interface{}) diag.Diagnostics
+}
+
+func FillNulls(ctx context.Context, value types.KubernetesValue, state PlanOrState) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	var stateValue basetypes.ObjectValue
+	diags.Append(state.Get(ctx, &stateValue)...)
+	if diags.HasError() {
+		return diags
+	}
+
+	diags.Append(value.FillNulls(ctx, path.Empty(), stateValue)...)
+	return diags
 }

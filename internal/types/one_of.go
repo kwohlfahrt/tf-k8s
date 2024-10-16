@@ -125,7 +125,7 @@ func (v KubernetesUnionValue) Type(context.Context) attr.Type {
 	return KubernetesUnionType{Members: v.MemberTypes}
 }
 
-func (v KubernetesUnionValue) FillNulls(ctx context.Context, path path.Path, config interface{}) diag.Diagnostics {
+func (v KubernetesUnionValue) FillNulls(ctx context.Context, path path.Path, config attr.Value) diag.Diagnostics {
 	var diags diag.Diagnostics
 
 	// TODO

@@ -180,26 +180,36 @@ func (v KubernetesListValue) Type(ctx context.Context) attr.Type {
 	return KubernetesListType{ListType: basetypes.ListType{ElemType: v.ElementType(ctx)}}
 }
 
-func (v *KubernetesListValue) FillNulls(ctx context.Context, path path.Path, config interface{}) diag.Diagnostics {
+func (v *KubernetesListValue) FillNulls(ctx context.Context, path path.Path, config attr.Value) diag.Diagnostics {
 	var diags diag.Diagnostics
 
-	listConfig, ok := config.([]interface{})
-	if !ok {
+	var kubernetesConfig *KubernetesListValue
+	switch config := config.(type) {
+	case basetypes.ListValue:
+		baseConfig, diags := v.Type(ctx).(KubernetesListType).ValueFromList(ctx, config)
+		if diags.HasError() {
+			return diags
+		}
+		kubernetesConfig = baseConfig.(*KubernetesListValue)
+	case *KubernetesListValue:
+		kubernetesConfig = config
+	default:
 		diags.Append(diag.NewAttributeErrorDiagnostic(
 			path, "Unexpected value type",
-			fmt.Sprintf("Expected list of items, got %T", config),
+			fmt.Sprintf("Expected ListValue, got %T", config),
 		))
 		return diags
 	}
 
-	if v.IsNull() && listConfig != nil && len(listConfig) == 0 {
+	configElements := kubernetesConfig.Elements()
+	if v.IsNull() && !kubernetesConfig.IsNull() && len(configElements) == 0 {
 		v.ListValue, diags = basetypes.NewListValue(v.ElementType(ctx), []attr.Value{})
-	} else if !v.IsNull() && listConfig == nil && len(v.Elements()) == 0 {
+	} else if !v.IsNull() && kubernetesConfig.IsNull() && len(v.Elements()) == 0 {
 		v.ListValue = basetypes.NewListNull(v.ElementType(ctx))
 	} else {
 		for i, v := range v.Elements() {
 			if kubernetesValue, ok := v.(KubernetesValue); ok {
-				kubernetesValue.FillNulls(ctx, path.AtListIndex(i), listConfig[i])
+				kubernetesValue.FillNulls(ctx, path.AtListIndex(i), configElements[i])
 			}
 		}
 	}
