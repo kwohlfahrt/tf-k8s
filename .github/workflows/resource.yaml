@@ -66,18 +66,17 @@ jobs:
           go install ./cmd/openapi
           go generate -x ./internal/provider/crd/...
 
-      - name: upload generated code
+      - name: upload type info
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.provider }}-crd.go
-          path: internal/provider/crd/crd.go
+          name: ${{ matrix.provider }}-typeInfos
+          path: internal/provider/crd/typeInfos.bin
 
       - name: go test
         run: |
           go test -v $(go list -f '{{ join .Deps "\n" }}' ./cmd/provider | grep github.com/kwohlfahrt/terraform-provider-k8scrd)
 
   build:
-    if: startswith(github.event.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     needs: [get-providers, test]
     strategy:
@@ -101,7 +100,7 @@ jobs:
       - name: download generated code
         uses: actions/download-artifact@v4
         with:
-          name: ${{ matrix.provider }}-crd.go
+          name: ${{ matrix.provider }}-typeInfos
           path: internal/provider/crd
 
       - name: go build
