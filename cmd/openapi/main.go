@@ -67,11 +67,6 @@ func getSchema(openapi *spec3.OpenAPI, gv runtimeschema.GroupVersion, resource m
 func main() {
 	flag.Parse()
 
-	file, err := os.Create("crd.go")
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-
 	dataFile, err := os.Create("typeInfos.bin")
 	if err != nil {
 		log.Fatal((err.Error()))
@@ -117,20 +112,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	file.WriteString("package crd\n\n")
-	file.WriteString("import (\n")
-	file.WriteString("\t\"bytes\"\n")
-	file.WriteString("\t_ \"embed\"\n")
-	file.WriteString("\t\"encoding/gob\"\n")
-	file.WriteString("\t\"errors\"\n")
-	file.WriteString("\t\"io\"\n\n")
-	file.WriteString("\t\"github.com/hashicorp/terraform-plugin-framework/types/basetypes\"\n")
-	file.WriteString("\t\"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/generic\"\n")
-	file.WriteString("\t\"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types\"\n")
-	file.WriteString(")\n\n")
-	file.WriteString("//go:embed typeInfos.bin\n")
-	file.WriteString("var typeInfos []byte\n")
-	file.WriteString("var TypeInfos []generic.TypeInfo\n\n")
 	for _, resourceList := range resourceLists {
 		gv, err := runtimeschema.ParseGroupVersion(resourceList.GroupVersion)
 		if err != nil {
@@ -206,29 +187,4 @@ func main() {
 			}
 		}
 	}
-
-	file.WriteString("func init() {\n")
-	file.WriteString("\tgob.Register(types.KubernetesObjectType{})\n")
-	file.WriteString("\tgob.Register(types.KubernetesListType{})\n")
-	file.WriteString("\tgob.Register(types.KubernetesMapType{})\n")
-	file.WriteString("\tgob.Register(types.KubernetesUnionType{})\n")
-	file.WriteString("\tgob.Register(basetypes.BoolType{})\n")
-	file.WriteString("\tgob.Register(basetypes.Int64Type{})\n")
-	file.WriteString("\tgob.Register(basetypes.Float64Type{})\n")
-	file.WriteString("\tgob.Register(basetypes.NumberType{})\n")
-	file.WriteString("\tgob.Register(basetypes.StringType{})\n")
-	file.WriteString("\tgob.Register(basetypes.StringType{})\n\n")
-	file.WriteString("\treader := bytes.NewReader(typeInfos)\n")
-	file.WriteString("\tdec := gob.NewDecoder(reader)\n")
-	file.WriteString("\tfor {\n")
-	file.WriteString("\tvar info generic.TypeInfo\n")
-	file.WriteString("\terr := dec.Decode(&info)\n")
-	file.WriteString("\tif errors.Is(err, io.EOF) {\n")
-	file.WriteString("\t\tbreak\n")
-	file.WriteString("\t} else if err != nil {\n")
-	file.WriteString("\t\tpanic(err)\n")
-	file.WriteString("\t}\n")
-	file.WriteString("\tTypeInfos = append(TypeInfos, info)\n")
-	file.WriteString("}\n")
-	file.WriteString("}\n")
 }
