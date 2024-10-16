@@ -1,6 +1,8 @@
 name: Build Resource Provider
 
 on:
+  schedule:
+    - cron: "15 4 * * 6"
   push:
     branches: [main]
     # Draft releases don't trigger actions, so create releases in the workflow
