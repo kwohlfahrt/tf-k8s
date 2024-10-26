@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -114,15 +115,17 @@ func extractFields(in interface{}, fieldSet *fieldpath.Set) (out interface{}, er
 		}
 
 		obj := make(map[string]interface{}, fieldSet.Children.Size()+fieldSet.Members.Size())
-		fieldSet.Members.Iterate(func(pe fieldpath.PathElement) {
-			obj[*pe.FieldName] = inObj[*pe.FieldName]
-		})
-		fieldSet.Children.Iterate(func(pe fieldpath.PathElement) {
-			child, err := extractFields(inObj[*pe.FieldName], fieldSet.WithPrefix(pe))
-			if err == nil {
-				obj[*pe.FieldName] = child
+		for k, v := range inObj {
+			p := fieldpath.PathElement{FieldName: &k}
+			if fieldSet.Members.Has(p) {
+				obj[k] = v
+			} else if childSet, found := fieldSet.Children.Get(p); found {
+				child, err := extractFields(v, childSet)
+				if err == nil {
+					obj[k] = child
+				}
 			}
-		})
+		}
 		out = obj
 	case isKey:
 		if isFieldName || isIndex || isValue {
@@ -133,36 +136,26 @@ func extractFields(in interface{}, fieldSet *fieldpath.Set) (out interface{}, er
 			return nil, fmt.Errorf("expected list, got %T", inObj)
 		}
 
+		ke, err := newKeyExtractor(fieldSet)
+		if err != nil {
+			return nil, err
+		}
 		obj := make([]interface{}, 0, fieldSet.Children.Size()+fieldSet.Members.Size())
 
-		// FIXME: Quadratic
-		fieldSet.Members.Iterate(func(pe fieldpath.PathElement) {
-			for _, v := range inObj {
-				vObj := v.(map[string]interface{})
-				keyFields := make([]value.Field, 0, len(*pe.Key))
-				for _, field := range *pe.Key {
-					keyFields = append(keyFields, value.Field{Name: field.Name, Value: value.NewValueInterface(vObj[field.Name])})
-				}
-				if pe.Key.Equals(keyFields) {
-					obj = append(obj, v)
+		for _, v := range inObj {
+			if v == nil {
+				continue
+			}
+			p := ke.extractKey(v.(map[string]interface{}))
+			if fieldSet.Members.Has(p) {
+				obj = append(obj, v)
+			} else if childSet, found := fieldSet.Children.Get(p); found {
+				child, err := extractFields(v, childSet)
+				if err == nil {
+					obj = append(obj, child)
 				}
 			}
-		})
-		fieldSet.Children.Iterate(func(pe fieldpath.PathElement) {
-			for _, v := range inObj {
-				vObj := v.(map[string]interface{})
-				keyFields := make([]value.Field, 0, len(*pe.Key))
-				for _, field := range *pe.Key {
-					keyFields = append(keyFields, value.Field{Name: field.Name, Value: value.NewValueInterface(vObj[field.Name])})
-				}
-				if pe.Key.Equals(keyFields) {
-					child, err := extractFields(v, fieldSet.WithPrefix(pe))
-					if err == nil {
-						obj = append(obj, child)
-					}
-				}
-			}
-		})
+		}
 
 		out = obj
 	case isIndex:
@@ -174,15 +167,17 @@ func extractFields(in interface{}, fieldSet *fieldpath.Set) (out interface{}, er
 			return nil, fmt.Errorf("expected list, got %T", inObj)
 		}
 		obj := make([]interface{}, 0, fieldSet.Children.Size()+fieldSet.Members.Size())
-		fieldSet.Members.Iterate(func(pe fieldpath.PathElement) {
-			obj = append(obj, inObj[*pe.Index])
-		})
-		fieldSet.Children.Iterate(func(pe fieldpath.PathElement) {
-			child, err := extractFields(inObj[*pe.Index], fieldSet.WithPrefix(pe))
-			if err == nil {
-				obj = append(obj, child)
+		for i, v := range inObj {
+			p := fieldpath.PathElement{Index: &i}
+			if fieldSet.Members.Has(p) {
+				obj = append(obj, v)
+			} else if childSet, found := fieldSet.Children.Get(p); found {
+				child, err := extractFields(v, childSet)
+				if err == nil {
+					obj = append(obj, child)
+				}
 			}
-		})
+		}
 		out = obj
 	case isValue:
 		// Is this reachable?
@@ -193,4 +188,43 @@ func extractFields(in interface{}, fieldSet *fieldpath.Set) (out interface{}, er
 	}
 
 	return
+}
+
+type keyExtractor struct {
+	keyFields []string
+}
+
+func newKeyExtractor(fs *fieldpath.Set) (*keyExtractor, error) {
+	var keyFields []string
+
+	mismatch := false
+	getKeys := func(pe fieldpath.PathElement) {
+		keys := make([]string, 0, len(*pe.Key))
+		for _, k := range *pe.Key {
+			keys = append(keys, k.Name)
+		}
+		if keyFields != nil {
+			if !slices.Equal(keys, keyFields) {
+				mismatch = true
+			}
+		} else {
+			keyFields = keys
+		}
+	}
+	fs.Members.Iterate(getKeys)
+	fs.Children.Iterate(getKeys)
+
+	if mismatch {
+		return nil, fmt.Errorf("mismatched keys in field path")
+	}
+	return &keyExtractor{keyFields: keyFields}, nil
+}
+
+func (e keyExtractor) extractKey(obj map[string]interface{}) fieldpath.PathElement {
+	fields := make(value.FieldList, 0, len(e.keyFields))
+	for _, k := range e.keyFields {
+		v := value.NewValueInterface(obj[k])
+		fields = append(fields, value.Field{Name: k, Value: v})
+	}
+	return fieldpath.PathElement{Key: &fields}
 }
