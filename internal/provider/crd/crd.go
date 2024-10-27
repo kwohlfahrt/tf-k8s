@@ -1,3 +1,4 @@
+//go:generate openapi ./versions/example.com.yaml
 package crd
 
 import (
