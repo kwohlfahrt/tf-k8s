@@ -55,22 +55,21 @@ func Extract(in *unstructured.Unstructured, fieldManager string) (*unstructured.
 			entry = &maybeEntry
 		}
 	}
-	if entry == nil {
-		return &unstructured.Unstructured{}, nil
-	}
+	object := map[string]interface{}{}
+	if entry != nil {
+		fieldSet := &fieldpath.Set{}
+		err := fieldSet.FromJSON(bytes.NewReader(entry.FieldsV1.Raw))
+		if err != nil {
+			return nil, diag.Diagnostics{diag.NewErrorDiagnostic("Unable to parse managed fields", err.Error())}
+		}
 
-	fieldSet := &fieldpath.Set{}
-	err := fieldSet.FromJSON(bytes.NewReader(entry.FieldsV1.Raw))
-	if err != nil {
-		return nil, diag.Diagnostics{diag.NewErrorDiagnostic("Unable to parse managed fields", err.Error())}
-	}
+		content, diags := extractFields(in.UnstructuredContent(), path.Empty(), fieldSet.Leaves())
+		if diags.HasError() {
+			return nil, diags
+		}
 
-	content, diags := extractFields(in.UnstructuredContent(), path.Empty(), fieldSet.Leaves())
-	if diags.HasError() {
-		return nil, diags
+		object = content.(map[string]interface{})
 	}
-
-	object := content.(map[string]interface{})
 	object["apiVersion"] = in.GetAPIVersion()
 	object["kind"] = in.GetKind()
 
@@ -84,7 +83,7 @@ func Extract(in *unstructured.Unstructured, fieldManager string) (*unstructured.
 	metadata["name"] = in.GetName()
 	metadata["namespace"] = in.GetNamespace()
 
-	return &unstructured.Unstructured{Object: content.(map[string]interface{})}, nil
+	return &unstructured.Unstructured{Object: object}, nil
 }
 
 func extractFields(in interface{}, path path.Path, fieldSet *fieldpath.Set) (out interface{}, diags diag.Diagnostics) {
