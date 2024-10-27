@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -47,7 +48,7 @@ func StateToObject(ctx context.Context, state tfsdk.Plan, typeInfo TypeInfo) (*u
 
 // A field extractor that doesn't depend on the schema, working around
 // https://github.com/kubernetes/kubernetes/issues/128201
-func Extract(in *unstructured.Unstructured, fieldManager string) (*unstructured.Unstructured, error) {
+func Extract(in *unstructured.Unstructured, fieldManager string) (*unstructured.Unstructured, diag.Diagnostics) {
 	var entry *v1.ManagedFieldsEntry
 	for _, maybeEntry := range in.GetManagedFields() {
 		if maybeEntry.Manager == fieldManager && maybeEntry.Operation == v1.ManagedFieldsOperationApply {
@@ -61,57 +62,65 @@ func Extract(in *unstructured.Unstructured, fieldManager string) (*unstructured.
 	fieldSet := &fieldpath.Set{}
 	err := fieldSet.FromJSON(bytes.NewReader(entry.FieldsV1.Raw))
 	if err != nil {
-		return nil, err
+		return nil, diag.Diagnostics{diag.NewErrorDiagnostic("Unable to parse managed fields", err.Error())}
 	}
 
-	content, err := extractFields(in.UnstructuredContent(), fieldSet.Leaves())
-	if err != nil {
-		return nil, err
+	content, diags := extractFields(in.UnstructuredContent(), path.Empty(), fieldSet.Leaves())
+	if diags.HasError() {
+		return nil, diags
 	}
 
 	object := content.(map[string]interface{})
 	object["apiVersion"] = in.GetAPIVersion()
 	object["kind"] = in.GetKind()
 
-	metadata := object["metadata"].(map[string]interface{})
+	var metadata map[string]interface{}
+	if object["metadata"] != nil {
+		metadata = object["metadata"].(map[string]interface{})
+	} else {
+		metadata = make(map[string]interface{}, 2)
+		object["metadata"] = metadata
+	}
 	metadata["name"] = in.GetName()
 	metadata["namespace"] = in.GetNamespace()
 
 	return &unstructured.Unstructured{Object: content.(map[string]interface{})}, nil
 }
 
-func extractFields(in interface{}, fieldSet *fieldpath.Set) (out interface{}, err error) {
-	isFieldName := false
-	isKey := false
-	isIndex := false
-	isValue := false
+func extractFields(in interface{}, path path.Path, fieldSet *fieldpath.Set) (out interface{}, diags diag.Diagnostics) {
+	fieldTypes := make(map[string]bool, 4)
 
 	checkType := func(pe fieldpath.PathElement) {
 		if pe.FieldName != nil {
-			isFieldName = true
+			fieldTypes["FieldName"] = true
 		}
 		if pe.Key != nil {
-			isKey = true
+			fieldTypes["Key"] = true
 		}
 		if pe.Index != nil {
-			isIndex = true
+			fieldTypes["Index"] = true
 		}
 		if pe.Value != nil {
-			isValue = true
+			fieldTypes["Value"] = true
 		}
 	}
 
 	fieldSet.Members.Iterate(checkType)
 	fieldSet.Children.Iterate(checkType)
 
+	if len(fieldTypes) > 1 {
+		return nil, diag.Diagnostics{diag.NewAttributeErrorDiagnostic(
+			path, "Got mixed index types", fmt.Sprintf("%v", maps.Keys(fieldTypes)),
+		)}
+	}
+
 	switch {
-	case isFieldName:
-		if isKey || isIndex || isValue {
-			return nil, fmt.Errorf("got mixed key types")
-		}
+	case fieldTypes["FieldName"]:
 		inObj, ok := in.(map[string]interface{})
 		if !ok {
-			return nil, fmt.Errorf("expected map, got %T", inObj)
+			return nil, diag.Diagnostics{diag.NewAttributeErrorDiagnostic(
+				path, "Expected map type", fmt.Sprintf("got: %T", in),
+			)}
 		}
 
 		obj := make(map[string]interface{}, fieldSet.Children.Size()+fieldSet.Members.Size())
@@ -120,29 +129,30 @@ func extractFields(in interface{}, fieldSet *fieldpath.Set) (out interface{}, er
 			if fieldSet.Members.Has(p) {
 				obj[k] = v
 			} else if childSet, found := fieldSet.Children.Get(p); found {
-				child, err := extractFields(v, childSet)
+				// Can't distinguish between map keys and attributes
+				child, err := extractFields(v, path.AtMapKey(k), childSet)
 				if err == nil {
 					obj[k] = child
 				}
 			}
 		}
 		out = obj
-	case isKey:
-		if isFieldName || isIndex || isValue {
-			return nil, fmt.Errorf("got mixed key types")
-		}
+	case fieldTypes["Key"]:
 		inObj, ok := in.([]interface{})
 		if !ok {
-			return nil, fmt.Errorf("expected list, got %T", inObj)
+			return nil, diag.Diagnostics{diag.NewAttributeErrorDiagnostic(
+				path, "Expected slice type", fmt.Sprintf("got: %T", in),
+			)}
 		}
 
-		ke, err := newKeyExtractor(fieldSet)
-		if err != nil {
-			return nil, err
+		ke, diag := newKeyExtractor(fieldSet)
+		if diag != nil {
+			diags.AddAttributeError(path, diag.Summary(), diag.Detail())
+			return nil, diags
 		}
 		obj := make([]interface{}, 0, fieldSet.Children.Size()+fieldSet.Members.Size())
 
-		for _, v := range inObj {
+		for i, v := range inObj {
 			if v == nil {
 				continue
 			}
@@ -150,7 +160,7 @@ func extractFields(in interface{}, fieldSet *fieldpath.Set) (out interface{}, er
 			if fieldSet.Members.Has(p) {
 				obj = append(obj, v)
 			} else if childSet, found := fieldSet.Children.Get(p); found {
-				child, err := extractFields(v, childSet)
+				child, err := extractFields(v, path.AtListIndex(i), childSet)
 				if err == nil {
 					obj = append(obj, child)
 				}
@@ -158,13 +168,12 @@ func extractFields(in interface{}, fieldSet *fieldpath.Set) (out interface{}, er
 		}
 
 		out = obj
-	case isIndex:
-		if isFieldName || isKey || isValue {
-			return nil, fmt.Errorf("got mixed key types")
-		}
+	case fieldTypes["Index"]:
 		inObj, ok := in.([]interface{})
 		if !ok {
-			return nil, fmt.Errorf("expected list, got %T", inObj)
+			return nil, diag.Diagnostics{diag.NewAttributeErrorDiagnostic(
+				path, "Expected slice type", fmt.Sprintf("got: %T", in),
+			)}
 		}
 		obj := make([]interface{}, 0, fieldSet.Children.Size()+fieldSet.Members.Size())
 		for i, v := range inObj {
@@ -172,18 +181,15 @@ func extractFields(in interface{}, fieldSet *fieldpath.Set) (out interface{}, er
 			if fieldSet.Members.Has(p) {
 				obj = append(obj, v)
 			} else if childSet, found := fieldSet.Children.Get(p); found {
-				child, err := extractFields(v, childSet)
+				child, err := extractFields(v, path.AtListIndex(i), childSet)
 				if err == nil {
 					obj = append(obj, child)
 				}
 			}
 		}
 		out = obj
-	case isValue:
+	case fieldTypes["Value"]:
 		// Is this reachable?
-		if isFieldName || isKey || isIndex {
-			return nil, fmt.Errorf("got mixed key types")
-		}
 		out = in
 	}
 
@@ -194,7 +200,7 @@ type keyExtractor struct {
 	keyFields []string
 }
 
-func newKeyExtractor(fs *fieldpath.Set) (*keyExtractor, error) {
+func newKeyExtractor(fs *fieldpath.Set) (*keyExtractor, diag.Diagnostic) {
 	var keyFields []string
 
 	mismatch := false
@@ -215,7 +221,7 @@ func newKeyExtractor(fs *fieldpath.Set) (*keyExtractor, error) {
 	fs.Children.Iterate(getKeys)
 
 	if mismatch {
-		return nil, fmt.Errorf("mismatched keys in field path")
+		return nil, diag.NewErrorDiagnostic("Mismatched key fields", "")
 	}
 	return &keyExtractor{keyFields: keyFields}, nil
 }

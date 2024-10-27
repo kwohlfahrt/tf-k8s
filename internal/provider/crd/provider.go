@@ -11,13 +11,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/generic"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/provider"
-	acmetav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/client-go/dynamic"
 )
 
 type Clients struct {
-	dynamic   *dynamic.DynamicClient
-	extractor acmetav1.UnstructuredExtractor
+	dynamic *dynamic.DynamicClient
 }
 
 type CrdProvider struct {
@@ -58,19 +56,7 @@ func (p *CrdProvider) Configure(ctx context.Context, req tfprovider.ConfigureReq
 		return
 	}
 
-	discovery, err := provider.MakeDiscoveryClient([]byte(data.Kubeconfig.ValueString()))
-	if err != nil {
-		resp.Diagnostics.AddError("Unable to make discovery client", err.Error())
-		return
-	}
-
-	extractor, err := acmetav1.NewUnstructuredExtractor(discovery)
-	if err != nil {
-		resp.Diagnostics.AddError("Unable to configure extractor", err.Error())
-		return
-	}
-
-	clients := Clients{dynamic: dynamic, extractor: extractor}
+	clients := Clients{dynamic: dynamic}
 	resp.DataSourceData = clients
 	resp.ResourceData = clients
 }

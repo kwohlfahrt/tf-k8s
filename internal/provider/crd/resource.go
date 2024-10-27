@@ -10,14 +10,12 @@ import (
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/generic"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	acmetav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/client-go/dynamic"
 )
 
 type crdResource struct {
-	typeInfo  generic.TypeInfo
-	client    *dynamic.DynamicClient
-	extractor acmetav1.UnstructuredExtractor
+	typeInfo generic.TypeInfo
+	client   *dynamic.DynamicClient
 }
 
 func NewResource(typeInfo generic.TypeInfo) tfresource.Resource {
@@ -61,7 +59,6 @@ func (c *crdResource) Configure(ctx context.Context, req tfresource.ConfigureReq
 	}
 
 	c.client = clients.dynamic
-	c.extractor = clients.extractor
 }
 
 const fieldManager string = "tofu-k8scrd"
@@ -92,9 +89,9 @@ func (c *crdResource) Create(ctx context.Context, req tfresource.CreateRequest, 
 		return
 	}
 
-	obj, err = c.extractor.Extract(obj, fieldManager)
-	if err != nil {
-		resp.Diagnostics.AddError("Unable to extract managed fields", err.Error())
+	obj, diags = generic.Extract(obj, fieldManager)
+	resp.Diagnostics.Append(diags...)
+	if diags.HasError() {
 		return
 	}
 
@@ -133,9 +130,9 @@ func (c *crdResource) Read(ctx context.Context, req tfresource.ReadRequest, resp
 		return
 	}
 
-	obj, err = c.extractor.Extract(obj, fieldManager)
-	if err != nil {
-		resp.Diagnostics.AddError("Unable to extract managed fields", err.Error())
+	obj, diags := generic.Extract(obj, fieldManager)
+	resp.Diagnostics.Append(diags...)
+	if diags.HasError() {
 		return
 	}
 
@@ -178,9 +175,9 @@ func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, 
 		return
 	}
 
-	obj, err = c.extractor.Extract(obj, fieldManager)
-	if err != nil {
-		resp.Diagnostics.AddError("Unable to extract managed fields", err.Error())
+	obj, diags = generic.Extract(obj, fieldManager)
+	resp.Diagnostics.Append(diags...)
+	if diags.HasError() {
 		return
 	}
 

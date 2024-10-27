@@ -57,9 +57,9 @@ func TestExtract(t *testing.T) {
 		dynamic.Resource(resource).Namespace(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
 	})
 
-	extracted, err := generic.Extract(obj, fieldManager)
-	if err != nil {
-		t.Fatal(err.Error())
+	extracted, diags := generic.Extract(obj, fieldManager)
+	if diags.HasError() {
+		t.Fatal("Errors extracting managed fields")
 	}
 	if !reflect.DeepEqual(spec, extracted) {
 		t.Fatal("extracted object does not match object spec")
