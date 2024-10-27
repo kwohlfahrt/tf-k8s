@@ -46,6 +46,26 @@ func StateToObject(ctx context.Context, state tfsdk.Plan, typeInfo TypeInfo) (*u
 	return &unstructured.Unstructured{Object: objMap}, diags
 }
 
+var defaultFields fieldpath.Set
+
+func init() {
+	apiVersion := "apiVersion"
+	defaultFields.Insert(fieldpath.Path{fieldpath.PathElement{FieldName: &apiVersion}})
+	kind := "kind"
+	defaultFields.Insert(fieldpath.Path{fieldpath.PathElement{FieldName: &kind}})
+	metadata := "metadata"
+	name := "name"
+	defaultFields.Insert(fieldpath.Path{
+		fieldpath.PathElement{FieldName: &metadata},
+		fieldpath.PathElement{FieldName: &name},
+	})
+	namespace := "namespace"
+	defaultFields.Insert(fieldpath.Path{
+		fieldpath.PathElement{FieldName: &metadata},
+		fieldpath.PathElement{FieldName: &namespace},
+	})
+}
+
 // A field extractor that doesn't depend on the schema, working around
 // https://github.com/kubernetes/kubernetes/issues/128201
 func Extract(in *unstructured.Unstructured, fieldManager string) (*unstructured.Unstructured, diag.Diagnostics) {
@@ -55,35 +75,22 @@ func Extract(in *unstructured.Unstructured, fieldManager string) (*unstructured.
 			entry = &maybeEntry
 		}
 	}
-	object := map[string]interface{}{}
+
+	fieldSet := &fieldpath.Set{}
 	if entry != nil {
-		fieldSet := &fieldpath.Set{}
 		err := fieldSet.FromJSON(bytes.NewReader(entry.FieldsV1.Raw))
 		if err != nil {
 			return nil, diag.Diagnostics{diag.NewErrorDiagnostic("Unable to parse managed fields", err.Error())}
 		}
-
-		content, diags := extractFields(in.UnstructuredContent(), path.Empty(), fieldSet.Leaves())
-		if diags.HasError() {
-			return nil, diags
-		}
-
-		object = content.(map[string]interface{})
 	}
-	object["apiVersion"] = in.GetAPIVersion()
-	object["kind"] = in.GetKind()
+	fieldSet = fieldSet.Union(&defaultFields)
 
-	var metadata map[string]interface{}
-	if object["metadata"] != nil {
-		metadata = object["metadata"].(map[string]interface{})
-	} else {
-		metadata = make(map[string]interface{}, 2)
-		object["metadata"] = metadata
+	content, diags := extractFields(in.UnstructuredContent(), path.Empty(), fieldSet.Leaves())
+	if diags.HasError() {
+		return nil, diags
 	}
-	metadata["name"] = in.GetName()
-	metadata["namespace"] = in.GetNamespace()
 
-	return &unstructured.Unstructured{Object: object}, nil
+	return &unstructured.Unstructured{Object: content.(map[string]interface{})}, nil
 }
 
 func extractFields(in interface{}, path path.Path, fieldSet *fieldpath.Set) (out interface{}, diags diag.Diagnostics) {
