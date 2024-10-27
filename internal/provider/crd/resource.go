@@ -155,7 +155,7 @@ func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, 
 	var name, namespace string
 	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("metadata").AtName("name"), &name)...)
 	if c.typeInfo.Namespaced {
-		resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("metadata").AtName("namespace"), &namespace)...)
+		resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("metadata").AtName("namespace"), &namespace)...)
 	}
 	if resp.Diagnostics.HasError() {
 		return
