@@ -17,6 +17,8 @@ import (
 
 type KubernetesListType struct {
 	basetypes.ListType
+
+	Keys []string
 }
 
 func (t KubernetesListType) Equal(o attr.Type) bool {
@@ -131,12 +133,21 @@ func ListFromOpenApi(root *spec3.OpenAPI, openapi spec.Schema, path []string) (K
 		return nil, fmt.Errorf("expected map of items at %s", strings.Join(path, ""))
 	}
 
+	extensions := openapi.VendorExtensible.Extensions
+	listType := extensions["x-kubernetes-list-type"].(string)
+	var keys []string
+	if listType == "map" {
+		for _, k := range extensions["x-kubernetes-list-map-keys"].([]interface{}) {
+			keys = append(keys, k.(string))
+		}
+	}
+
 	elemType, err := OpenApiToTfType(root, *items, append(path, "[*]"))
 	if err != nil {
 		return nil, err
 	}
 
-	return KubernetesListType{ListType: basetypes.ListType{ElemType: elemType}}, nil
+	return KubernetesListType{ListType: basetypes.ListType{ElemType: elemType}, Keys: keys}, nil
 }
 
 var _ basetypes.ListTypable = KubernetesListType{}
