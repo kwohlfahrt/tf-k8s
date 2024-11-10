@@ -89,13 +89,7 @@ func (c *crdResource) Create(ctx context.Context, req tfresource.CreateRequest, 
 		return
 	}
 
-	obj, diags = generic.Extract(obj, fieldManager)
-	resp.Diagnostics.Append(diags...)
-	if diags.HasError() {
-		return
-	}
-
-	state, diags := generic.ObjectToState(ctx, c.typeInfo.Schema, *obj)
+	state, diags := generic.ObjectToState(ctx, c.typeInfo.Schema, *obj, fieldManager)
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
@@ -130,13 +124,7 @@ func (c *crdResource) Read(ctx context.Context, req tfresource.ReadRequest, resp
 		return
 	}
 
-	obj, diags := generic.Extract(obj, fieldManager)
-	resp.Diagnostics.Append(diags...)
-	if diags.HasError() {
-		return
-	}
-
-	state, diags := generic.ObjectToState(ctx, c.typeInfo.Schema, *obj)
+	state, diags := generic.ObjectToState(ctx, c.typeInfo.Schema, *obj, fieldManager)
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
@@ -175,13 +163,7 @@ func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, 
 		return
 	}
 
-	obj, diags = generic.Extract(obj, fieldManager)
-	resp.Diagnostics.Append(diags...)
-	if diags.HasError() {
-		return
-	}
-
-	state, diags := generic.ObjectToState(ctx, c.typeInfo.Schema, *obj)
+	state, diags := generic.ObjectToState(ctx, c.typeInfo.Schema, *obj, fieldManager)
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return

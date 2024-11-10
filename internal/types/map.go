@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"k8s.io/kube-openapi/pkg/spec3"
 	"k8s.io/kube-openapi/pkg/validation/spec"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 type KubernetesMapType struct {
@@ -60,7 +61,12 @@ func (t KubernetesMapType) ValueType(ctx context.Context) attr.Value {
 	return KubernetesMapValue{}
 }
 
-func (t KubernetesMapType) ValueFromUnstructured(ctx context.Context, path path.Path, obj interface{}) (attr.Value, diag.Diagnostics) {
+func (t KubernetesMapType) ValueFromUnstructured(
+	ctx context.Context,
+	path path.Path,
+	fields *fieldpath.Set,
+	obj interface{},
+) (attr.Value, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	mapObj, ok := obj.(map[string]interface{})
 	if !ok {
@@ -77,10 +83,21 @@ func (t KubernetesMapType) ValueFromUnstructured(ctx context.Context, path path.
 
 		var elem attr.Value
 		var attrDiags diag.Diagnostics
-		if kubernetesElem, ok := t.ElemType.(KubernetesType); ok {
-			elem, attrDiags = kubernetesElem.ValueFromUnstructured(ctx, elemPath, value)
+		p := fieldpath.PathElement{FieldName: &k}
+		if kubernetesElemType, ok := t.ElemType.(KubernetesType); ok {
+			if fields == nil || fields.Members.Has(p) {
+				elem, attrDiags = kubernetesElemType.ValueFromUnstructured(ctx, elemPath, nil, value)
+			} else if childFields, found := fields.Children.Get(p); found {
+				elem, attrDiags = kubernetesElemType.ValueFromUnstructured(ctx, elemPath, childFields, value)
+			} else {
+				continue
+			}
 		} else {
-			elem, attrDiags = primitiveFromUnstructured(ctx, elemPath, t.ElemType, value)
+			if fields == nil || fields.Members.Has(p) {
+				elem, attrDiags = primitiveFromUnstructured(ctx, elemPath, t.ElemType, value)
+			} else {
+				continue
+			}
 		}
 		diags.Append(attrDiags...)
 		if attrDiags.HasError() {

@@ -95,7 +95,7 @@ func (c *crdDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 		return
 	}
 
-	state, diags := c.typeInfo.Schema.ValueFromUnstructured(ctx, path.Empty(), obj.UnstructuredContent())
+	state, diags := c.typeInfo.Schema.ValueFromUnstructured(ctx, path.Empty(), nil, obj.UnstructuredContent())
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return

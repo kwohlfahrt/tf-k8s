@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"k8s.io/kube-openapi/pkg/spec3"
 	"k8s.io/kube-openapi/pkg/validation/spec"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 type KubernetesUnionType struct {
@@ -30,13 +31,18 @@ func (t KubernetesUnionType) SchemaType(ctx context.Context, required bool) (sch
 	}, nil
 }
 
-func (t KubernetesUnionType) ValueFromUnstructured(ctx context.Context, path path.Path, obj interface{}) (attr.Value, diag.Diagnostics) {
+func (t KubernetesUnionType) ValueFromUnstructured(
+	ctx context.Context,
+	path path.Path,
+	fields *fieldpath.Set,
+	obj interface{},
+) (attr.Value, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	for _, member := range t.Members {
 		var val attr.Value
 		var memberDiags diag.Diagnostics
 		if kubernetesMember, ok := member.(KubernetesType); ok {
-			val, memberDiags = kubernetesMember.ValueFromUnstructured(ctx, path, obj)
+			val, memberDiags = kubernetesMember.ValueFromUnstructured(ctx, path, fields, obj)
 		} else {
 			val, memberDiags = primitiveFromUnstructured(ctx, path, member, obj)
 		}
