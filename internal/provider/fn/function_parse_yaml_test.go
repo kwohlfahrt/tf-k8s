@@ -53,25 +53,25 @@ func TestParseYaml(t *testing.T) {
 						knownvalue.ListExact(
 							[]knownvalue.Check{
 								knownvalue.ObjectPartial(map[string]knownvalue.Check{
-									"api_version": knownvalue.StringExact("cert-manager.io/v1"),
-									"kind":        knownvalue.StringExact("Certificate"),
+									"apiVersion": knownvalue.StringExact("cert-manager.io/v1"),
+									"kind":       knownvalue.StringExact("Certificate"),
 									"metadata": knownvalue.ObjectExact(map[string]knownvalue.Check{
 										"name": knownvalue.StringExact("foo"),
 									}),
 									"spec": knownvalue.ObjectPartial(map[string]knownvalue.Check{
-										"dns_names": knownvalue.ListExact([]knownvalue.Check{
+										"dnsNames": knownvalue.ListExact([]knownvalue.Check{
 											knownvalue.StringExact("foo.example.com"),
 										}),
 									}),
 								}),
 								knownvalue.ObjectPartial(map[string]knownvalue.Check{
-									"api_version": knownvalue.StringExact("cert-manager.io/v1"),
-									"kind":        knownvalue.StringExact("Certificate"),
+									"apiVersion": knownvalue.StringExact("cert-manager.io/v1"),
+									"kind":       knownvalue.StringExact("Certificate"),
 									"metadata": knownvalue.ObjectPartial(map[string]knownvalue.Check{
 										"name": knownvalue.StringExact("bar"),
 									}),
 									"spec": knownvalue.ObjectPartial(map[string]knownvalue.Check{
-										"dns_names": knownvalue.ListExact([]knownvalue.Check{
+										"dnsNames": knownvalue.ListExact([]knownvalue.Check{
 											knownvalue.StringExact("bar.example.com"),
 										}),
 									}),

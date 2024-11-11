@@ -346,9 +346,8 @@ func DynamicObjectFromUnstructured(ctx context.Context, path path.Path, val map[
 
 	attrValues := make(map[string]attr.Value, len(val))
 	attrTypes := make(map[string]attr.Type, len(val))
-	fieldNames := make(map[string]string, len(val))
 	for k, v := range val {
-		fieldName := strcase.SnakeCase(k)
+		fieldName := k
 		fieldPath := path.AtName(fieldName)
 		var attrValue attr.Value
 		var attrDiags diag.Diagnostics
@@ -365,21 +364,13 @@ func DynamicObjectFromUnstructured(ctx context.Context, path path.Path, val map[
 			continue
 		}
 
-		fieldNames[fieldName] = k
 		attrValues[fieldName] = attrValue
 		attrTypes[fieldName] = attrValue.Type(ctx)
 	}
-	typ := KubernetesObjectType{
-		ObjectType: basetypes.ObjectType{AttrTypes: attrTypes},
-		FieldNames: fieldNames,
-	}
-
 	obj, objDiags := basetypes.NewObjectValue(attrTypes, attrValues)
 	diags.Append(objDiags...)
 
-	kubernetesObj, objDiags := typ.ValueFromObject(ctx, obj)
-	diags.Append(objDiags...)
-	return kubernetesObj, diags
+	return obj, diags
 }
 
 func (v *KubernetesObjectValue) FillNulls(ctx context.Context, path path.Path, config attr.Value) diag.Diagnostics {
