@@ -78,7 +78,11 @@ func (p *CrdProvider) Resources(context.Context) []func() resource.Resource {
 }
 
 func (p *CrdProvider) Functions(context.Context) []func() function.Function {
-	return []func() function.Function{}
+	result := make([]func() function.Function, 0, len(p.typeInfos))
+	for _, typeInfo := range p.typeInfos {
+		result = append(result, func() function.Function { return NewParseYAMLFunction(typeInfo) })
+	}
+	return result
 }
 
 func New(version string) (func() tfprovider.Provider, error) {
