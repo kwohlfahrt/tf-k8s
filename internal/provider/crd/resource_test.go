@@ -51,9 +51,10 @@ func TestAccResource(t *testing.T) {
 		},
 		Steps: []resource.TestStep{
 			{
-				Config:          string(cfg),
-				ConfigVariables: config.Variables{"kubeconfig": config.StringVariable(string(kubeconfig))},
-				Check:           makeChecks(k, checkSpeck),
+				Config:           string(cfg),
+				ConfigVariables:  config.Variables{"kubeconfig": config.StringVariable(string(kubeconfig))},
+				Check:            makeChecks(k, checkSpeck.Resources),
+				ConfigPlanChecks: makeConfigChecks(checkSpeck.Properties),
 			},
 		},
 		CheckDestroy: makeDestroyChecks(k, checkSpeck.Resources),

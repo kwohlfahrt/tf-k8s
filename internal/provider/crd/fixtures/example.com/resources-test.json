@@ -2,12 +2,12 @@
     "Properties": [
         {
             "Name": "k8scrd_foo_example_com_v1.bar",
-            "Path": "spec.foo",
+            "Path": ["spec", "foo"],
             "Value": "bar"
         },
         {
             "Name": "k8scrd_bar_example_com_v1.bar",
-            "Path": "spec.bar",
+            "Path": ["spec", "bar"],
             "Value": "bar"
         }
     ],

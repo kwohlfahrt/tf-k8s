@@ -51,9 +51,10 @@ func TestAccDataSource(t *testing.T) {
 		},
 		Steps: []resource.TestStep{
 			{
-				Config:          string(cfg),
-				ConfigVariables: config.Variables{"kubeconfig": config.StringVariable(string(kubeconfig))},
-				Check:           makeChecks(k, checkSpec),
+				Config:            string(cfg),
+				ConfigVariables:   config.Variables{"kubeconfig": config.StringVariable(string(kubeconfig))},
+				Check:             makeChecks(k, checkSpec.Resources),
+				ConfigStateChecks: makeStateChecks(checkSpec.Properties),
 			},
 		},
 	})

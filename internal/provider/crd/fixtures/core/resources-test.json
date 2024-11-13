@@ -2,37 +2,37 @@
     "Properties": [
         {
             "Name": "k8scrd_configmap_v1.bar",
-            "Path": "data.foo.txt",
+            "Path": ["data", "foo.txt"],
             "Value": "bar"
         },
         {
             "Name": "k8scrd_deployment_apps_v1.bar",
-            "Path": "spec.replicas",
-            "Value": "0"
+            "Path": ["spec", "replicas"],
+            "Value": 0
         },
         {
             "Name": "k8scrd_deployment_apps_v1.bar",
-            "Path": "spec.strategy.rolling_update.max_unavailable",
-            "Value": "1"
+            "Path": ["spec", "strategy", "rolling_update", "max_unavailable"],
+            "Value": 1
         },
         {
             "Name": "k8scrd_deployment_apps_v1.baz",
-            "Path": "spec.replicas",
-            "Value": "0"
+            "Path": ["spec", "replicas"],
+            "Value": 0
         },
         {
             "Name": "k8scrd_namespace_v1.bar",
-            "Path": "metadata.name",
+            "Path": ["metadata", "name"],
             "Value": "bar"
         },
         {
             "Name": "k8scrd_namespace_v1.baz",
-            "Path": "metadata.name",
+            "Path": ["metadata", "name"],
             "Value": "baz"
         },
         {
             "Name": "k8scrd_clusterrole_rbac_authorization_k8s_io_v1.bar",
-            "Path": "rules.0.verbs.0",
+            "Path": ["rules", 0, "verbs", 0],
             "Value": "get"
         }
     ],
