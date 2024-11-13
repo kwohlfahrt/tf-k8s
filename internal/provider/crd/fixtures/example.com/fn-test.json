@@ -1,0 +1,9 @@
+{
+    "Outputs": [
+        {
+            "Name": "foo",
+            "Path": ["spec", "foo"],
+            "Value": "bar"
+        }
+    ]
+}

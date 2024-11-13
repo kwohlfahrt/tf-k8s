@@ -69,6 +69,7 @@ type checkResource struct {
 type checkSpec struct {
 	Resources  []checkResource
 	Properties []checkProperty
+	Outputs    []checkProperty
 }
 
 func parsePath(path []interface{}) tfjsonpath.Path {
@@ -122,11 +123,16 @@ func makeChecks(client *dynamic.DynamicClient, spec []checkResource) resource.Te
 	return resource.ComposeAggregateTestCheckFunc(checks...)
 }
 
-func makeConfigChecks(spec []checkProperty) resource.ConfigPlanChecks {
-	checks := make([]plancheck.PlanCheck, 0, len(spec))
+func makeConfigChecks(spec []checkProperty, outputSpec []checkProperty) resource.ConfigPlanChecks {
+	checks := make([]plancheck.PlanCheck, 0, len(spec)+len(outputSpec))
 
 	for _, property := range spec {
 		check := plancheck.ExpectKnownValue(property.Name, parsePath(property.Path), parseValue(property.Value))
+		checks = append(checks, check)
+	}
+
+	for _, output := range outputSpec {
+		check := plancheck.ExpectKnownOutputValueAtPath(output.Name, parsePath(output.Path), parseValue(output.Value))
 		checks = append(checks, check)
 	}
 

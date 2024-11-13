@@ -54,7 +54,7 @@ func TestAccResource(t *testing.T) {
 				Config:           string(cfg),
 				ConfigVariables:  config.Variables{"kubeconfig": config.StringVariable(string(kubeconfig))},
 				Check:            makeChecks(k, checkSpeck.Resources),
-				ConfigPlanChecks: makeConfigChecks(checkSpeck.Properties),
+				ConfigPlanChecks: makeConfigChecks(checkSpeck.Properties, checkSpeck.Outputs),
 			},
 		},
 		CheckDestroy: makeDestroyChecks(k, checkSpeck.Resources),

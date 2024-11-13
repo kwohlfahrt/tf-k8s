@@ -10,8 +10,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/config"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
-	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/provider/crd"
 )
 
@@ -26,7 +24,7 @@ func TestAccFn(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rawCheckSpec, err := os.ReadFile(fmt.Sprintf("fixtures/%s/resources-test.json", os.Getenv("PROVIDER")))
+	rawCheckSpec, err := os.ReadFile(fmt.Sprintf("fixtures/%s/fn-test.json", os.Getenv("PROVIDER")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,20 +45,9 @@ func TestAccFn(t *testing.T) {
 		},
 		Steps: []resource.TestStep{
 			{
-				Config:          string(cfg),
-				ConfigVariables: config.Variables{"kubeconfig": config.StringVariable(string(kubeconfig))},
-				ConfigPlanChecks: resource.ConfigPlanChecks{
-					PreApply: []plancheck.PlanCheck{
-						plancheck.ExpectKnownOutputValue(
-							"pod",
-							knownvalue.ObjectPartial(map[string]knownvalue.Check{
-								"metadata": knownvalue.ObjectPartial(map[string]knownvalue.Check{
-									"name": knownvalue.StringExact("bar"),
-								}),
-							}),
-						),
-					},
-				},
+				Config:           string(cfg),
+				ConfigVariables:  config.Variables{"kubeconfig": config.StringVariable(string(kubeconfig))},
+				ConfigPlanChecks: makeConfigChecks(checkSpeck.Properties, checkSpeck.Outputs),
 			},
 		},
 	})

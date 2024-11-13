@@ -7,8 +7,8 @@ provider "k8scrd" {
   kubeconfig = var.kubeconfig
 }
 
-locals {
-  pod = provider::k8scrd::parse_foo_example_com_v1({
+output "foo" {
+  value = provider::k8scrd::parse_foo_example_com_v1({
     apiVersion = "example.com/v1"
     kind = "Foo"
     metadata = {
