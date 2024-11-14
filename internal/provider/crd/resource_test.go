@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/config"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/provider"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/provider/crd"
 )
@@ -55,6 +56,55 @@ func TestAccResource(t *testing.T) {
 				ConfigVariables:  config.Variables{"kubeconfig": config.StringVariable(string(kubeconfig))},
 				Check:            makeChecks(k, checkSpeck.Resources),
 				ConfigPlanChecks: makeConfigChecks(checkSpeck.Properties, checkSpeck.Outputs),
+			},
+		},
+		CheckDestroy: makeDestroyChecks(k, checkSpeck.Resources),
+	})
+}
+
+func TestAccResourceImport(t *testing.T) {
+	kubeconfig, err := os.ReadFile(os.Getenv("KUBECONFIG"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	k, err := provider.MakeDynamicClient(kubeconfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	providerFactory, err := crd.New("test")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rawCheckSpec, err := os.ReadFile(fmt.Sprintf("fixtures/%s/resources-import-test.json", os.Getenv("PROVIDER")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var checkSpeck checkSpec
+	err = json.Unmarshal(rawCheckSpec, &checkSpeck)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := os.ReadFile(fmt.Sprintf("./fixtures/%s/resources-import.tf", os.Getenv("PROVIDER")))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	configPlanChecks := makeConfigChecks(checkSpeck.Properties, checkSpeck.Outputs)
+	configPlanChecks.PreApply = []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: map[string]func() (tfprotov6.ProviderServer, error){
+			"k8scrd": providerserver.NewProtocol6WithError(providerFactory()),
+		},
+		Steps: []resource.TestStep{
+			{
+				Config:           string(cfg),
+				ConfigVariables:  config.Variables{"kubeconfig": config.StringVariable(string(kubeconfig))},
+				ConfigPlanChecks: configPlanChecks,
 			},
 		},
 		CheckDestroy: makeDestroyChecks(k, checkSpeck.Resources),

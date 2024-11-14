@@ -4,3 +4,10 @@ metadata:
   name: foo
 spec:
   foo: foo
+---
+apiVersion: example.com/v1
+kind: Foo
+metadata:
+  name: baz
+spec:
+  foo: baz
