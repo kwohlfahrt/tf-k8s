@@ -10,17 +10,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/config"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/provider"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/provider/crd"
 )
 
-func TestAccResource(t *testing.T) {
+func TestAccFn(t *testing.T) {
 	kubeconfig, err := os.ReadFile(os.Getenv("KUBECONFIG"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	k, err := provider.MakeDynamicClient(kubeconfig)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -30,7 +24,7 @@ func TestAccResource(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rawCheckSpec, err := os.ReadFile(fmt.Sprintf("fixtures/%s/resources-test.json", os.Getenv("PROVIDER")))
+	rawCheckSpec, err := os.ReadFile(fmt.Sprintf("fixtures/%s/fn-test.json", os.Getenv("PROVIDER")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +34,7 @@ func TestAccResource(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cfg, err := os.ReadFile(fmt.Sprintf("./fixtures/%s/resources.tf", os.Getenv("PROVIDER")))
+	cfg, err := os.ReadFile(fmt.Sprintf("./fixtures/%s/fn.tf", os.Getenv("PROVIDER")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,10 +47,8 @@ func TestAccResource(t *testing.T) {
 			{
 				Config:           string(cfg),
 				ConfigVariables:  config.Variables{"kubeconfig": config.StringVariable(string(kubeconfig))},
-				Check:            makeChecks(k, checkSpeck.Resources),
 				ConfigPlanChecks: makeConfigChecks(checkSpeck.Properties, checkSpeck.Outputs),
 			},
 		},
-		CheckDestroy: makeDestroyChecks(k, checkSpeck.Resources),
 	})
 }
