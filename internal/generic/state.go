@@ -3,7 +3,6 @@ package generic
 import (
 	"bytes"
 	"context"
-	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -14,33 +13,26 @@ import (
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
-func ObjectToState(ctx context.Context, typ types.KubernetesObjectType, obj unstructured.Unstructured, fieldManager string) (types.KubernetesValue, diag.Diagnostics) {
+type PlanOrState interface {
+	Get(ctx context.Context, target interface{}) diag.Diagnostics
+}
+
+func StateToValue(ctx context.Context, state PlanOrState, typeInfo TypeInfo) (types.KubernetesValue, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
-	fields, fieldsDiags := getManagedFieldSet(&obj, fieldManager)
-	diags.Append(fieldsDiags...)
+	var stateValue basetypes.ObjectValue
+	diags.Append(state.Get(ctx, &stateValue)...)
 	if diags.HasError() {
 		return nil, diags
 	}
 
-	value, valueDiags := typ.ValueFromUnstructured(ctx, path.Empty(), fields, obj.UnstructuredContent())
+	value, valueDiags := typeInfo.Schema.ValueFromObject(ctx, stateValue)
 	diags.Append(valueDiags...)
-	if valueDiags.HasError() {
+	if diags.HasError() {
 		return nil, diags
 	}
-	kubernetesValue, ok := value.(*types.KubernetesObjectValue)
-	if !ok {
-		diags.AddError(
-			"Unexpected value type",
-			fmt.Sprintf("Expected KubernetesObjectValue, got %T. This is a provider-internal error.", value),
-		)
-	}
-
-	return kubernetesValue, diags
-}
-
-type PlanOrState interface {
-	Get(ctx context.Context, target interface{}) diag.Diagnostics
+	objectValue := value.(*types.KubernetesObjectValue)
+	return objectValue, diags
 }
 
 func FillNulls(ctx context.Context, value types.KubernetesValue, state PlanOrState) diag.Diagnostics {
@@ -76,7 +68,7 @@ func init() {
 	})
 }
 
-func getManagedFieldSet(in *unstructured.Unstructured, fieldManager string) (*fieldpath.Set, diag.Diagnostics) {
+func GetManagedFieldSet(in *unstructured.Unstructured, fieldManager string) (*fieldpath.Set, diag.Diagnostics) {
 	var entry *v1.ManagedFieldsEntry
 	for _, maybeEntry := range in.GetManagedFields() {
 		if maybeEntry.Manager == fieldManager && maybeEntry.Operation == v1.ManagedFieldsOperationApply {

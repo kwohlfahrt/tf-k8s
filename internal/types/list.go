@@ -257,5 +257,47 @@ func (v *KubernetesListValue) FillNulls(ctx context.Context, path path.Path, con
 	return diags
 }
 
+func (v KubernetesListValue) ManagedFields(ctx context.Context, path path.Path, fields *fieldpath.Set, pe *fieldpath.PathElement) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	fields = fields.Children.Descend(*pe)
+	for i, elem := range v.Elements() {
+		if elem.IsNull() {
+			continue
+		}
+
+		fieldPath := path.AtListIndex(i)
+
+		var pathElem fieldpath.PathElement
+		if v.keys != nil {
+			key := make(diffvalue.FieldList, 0, len(v.keys))
+
+			obj := elem.(KubernetesObjectValue)
+			unstructured, objDiags := obj.ToUnstructured(ctx, path)
+			diags.Append(objDiags...)
+			if objDiags.HasError() {
+				continue
+			}
+
+			unstructuredObj := unstructured.(map[string]interface{})
+			for _, k := range v.keys {
+				v := diffvalue.NewValueInterface(unstructuredObj[k])
+				key = append(key, diffvalue.Field{Name: k, Value: v})
+			}
+			pathElem = fieldpath.PathElement{Key: &key}
+		} else {
+			pathElem = fieldpath.PathElement{Index: &i}
+		}
+
+		if kubernetesAttr, ok := elem.(KubernetesValue); ok {
+			diags.Append(kubernetesAttr.ManagedFields(ctx, fieldPath, fields, &pathElem)...)
+		} else {
+			fields.Insert([]fieldpath.PathElement{pathElem})
+		}
+	}
+
+	return diags
+}
+
 var _ basetypes.ListValuable = KubernetesListValue{}
 var _ KubernetesValue = &KubernetesListValue{}

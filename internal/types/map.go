@@ -234,5 +234,26 @@ func (v *KubernetesMapValue) FillNulls(ctx context.Context, path path.Path, conf
 	return diags
 }
 
+func (v KubernetesMapValue) ManagedFields(ctx context.Context, path path.Path, fields *fieldpath.Set, pe *fieldpath.PathElement) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	fields = fields.Children.Descend(*pe)
+	for k, elem := range v.Elements() {
+		if elem.IsNull() {
+			continue
+		}
+
+		fieldPath := path.AtMapKey(k)
+		pathElem := fieldpath.PathElement{FieldName: &k}
+		if kubernetesAttr, ok := elem.(KubernetesValue); ok {
+			diags.Append(kubernetesAttr.ManagedFields(ctx, fieldPath, fields, &pathElem)...)
+		} else {
+			fields.Insert([]fieldpath.PathElement{pathElem})
+		}
+	}
+
+	return diags
+}
+
 var _ basetypes.MapValuable = KubernetesMapValue{}
 var _ KubernetesValue = &KubernetesMapValue{}

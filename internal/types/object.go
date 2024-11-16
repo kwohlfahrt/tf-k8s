@@ -279,6 +279,7 @@ type KubernetesValue interface {
 	attr.Value
 
 	ToUnstructured(ctx context.Context, path path.Path) (interface{}, diag.Diagnostics)
+	ManagedFields(ctx context.Context, path path.Path, fields *fieldpath.Set, pe *fieldpath.PathElement) diag.Diagnostics
 	FillNulls(ctx context.Context, path path.Path, config attr.Value) diag.Diagnostics
 }
 
@@ -371,6 +372,37 @@ func DynamicObjectFromUnstructured(ctx context.Context, path path.Path, val map[
 	diags.Append(objDiags...)
 
 	return obj, diags
+}
+
+func (v KubernetesObjectValue) ManagedFields(ctx context.Context, path path.Path, fields *fieldpath.Set, pe *fieldpath.PathElement) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	if pe != nil {
+		fields = fields.Children.Descend(*pe)
+	}
+
+	for k, attr := range v.Attributes() {
+		if attr.IsNull() {
+			continue
+		}
+
+		fieldPath := path.AtName(k)
+		fieldName, found := v.fieldNames[k]
+		if !found {
+			diags.Append(diag.NewAttributeErrorDiagnostic(
+				fieldPath, "Unexpected field",
+				"Field does not have a mapping to a Kubernetes property. This is a provider-internal error, please report it!",
+			))
+			continue
+		}
+		pathElem := fieldpath.PathElement{FieldName: &fieldName}
+		if kubernetesAttr, ok := attr.(KubernetesValue); ok {
+			diags.Append(kubernetesAttr.ManagedFields(ctx, fieldPath, fields, &pathElem)...)
+		} else {
+			fields.Insert([]fieldpath.PathElement{pathElem})
+		}
+	}
+	return diags
 }
 
 func (v *KubernetesObjectValue) FillNulls(ctx context.Context, path path.Path, config attr.Value) diag.Diagnostics {

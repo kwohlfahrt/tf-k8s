@@ -73,7 +73,12 @@ func (c *crdResource) Create(ctx context.Context, req tfresource.CreateRequest, 
 		return
 	}
 
-	planObj, diags := generic.StateToObject(ctx, req.Plan, c.typeInfo)
+	state, diags := generic.StateToValue(ctx, req.Plan, c.typeInfo)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	planObj, diags := generic.ValueToUnstructured(ctx, state, c.typeInfo)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -89,7 +94,12 @@ func (c *crdResource) Create(ctx context.Context, req tfresource.CreateRequest, 
 		return
 	}
 
-	state, diags := generic.ObjectToState(ctx, c.typeInfo.Schema, *obj, fieldManager)
+	fields, diags := generic.GetManagedFieldSet(obj, fieldManager)
+	resp.Diagnostics.Append(diags...)
+	if diags.HasError() {
+		return
+	}
+	state, diags = generic.UnstructuredToValue(ctx, c.typeInfo.Schema, *obj, fields)
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
@@ -124,7 +134,13 @@ func (c *crdResource) Read(ctx context.Context, req tfresource.ReadRequest, resp
 		return
 	}
 
-	state, diags := generic.ObjectToState(ctx, c.typeInfo.Schema, *obj, fieldManager)
+	fields, diags := generic.GetManagedFieldSet(obj, fieldManager)
+	resp.Diagnostics.Append(diags...)
+	if diags.HasError() {
+		return
+	}
+
+	state, diags := generic.UnstructuredToValue(ctx, c.typeInfo.Schema, *obj, fields)
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
@@ -149,7 +165,12 @@ func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, 
 		return
 	}
 
-	obj, diags := generic.StateToObject(ctx, req.Plan, c.typeInfo)
+	state, diags := generic.StateToValue(ctx, req.Plan, c.typeInfo)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	obj, diags := generic.ValueToUnstructured(ctx, state, c.typeInfo)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -163,7 +184,12 @@ func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, 
 		return
 	}
 
-	state, diags := generic.ObjectToState(ctx, c.typeInfo.Schema, *obj, fieldManager)
+	fields, diags := generic.GetManagedFieldSet(obj, fieldManager)
+	resp.Diagnostics.Append(diags...)
+	if diags.HasError() {
+		return
+	}
+	state, diags = generic.UnstructuredToValue(ctx, c.typeInfo.Schema, *obj, fields)
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
