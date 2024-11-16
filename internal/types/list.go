@@ -13,10 +13,14 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"k8s.io/kube-openapi/pkg/spec3"
 	"k8s.io/kube-openapi/pkg/validation/spec"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	diffvalue "sigs.k8s.io/structured-merge-diff/v4/value"
 )
 
 type KubernetesListType struct {
 	basetypes.ListType
+
+	Keys []string
 }
 
 func (t KubernetesListType) Equal(o attr.Type) bool {
@@ -33,7 +37,7 @@ func (t KubernetesListType) String() string {
 }
 
 func (t KubernetesListType) ValueFromList(ctx context.Context, in basetypes.ListValue) (basetypes.ListValuable, diag.Diagnostics) {
-	value := KubernetesListValue{ListValue: in}
+	value := KubernetesListValue{ListValue: in, keys: t.Keys}
 	return &value, nil
 }
 
@@ -60,7 +64,7 @@ func (t KubernetesListType) ValueType(ctx context.Context) attr.Value {
 	return KubernetesListValue{}
 }
 
-func (t KubernetesListType) ValueFromUnstructured(ctx context.Context, path path.Path, obj interface{}) (attr.Value, diag.Diagnostics) {
+func (t KubernetesListType) ValueFromUnstructured(ctx context.Context, path path.Path, fields *fieldpath.Set, obj interface{}) (attr.Value, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	sliceObj, ok := obj.([]interface{})
 	if !ok {
@@ -77,11 +81,36 @@ func (t KubernetesListType) ValueFromUnstructured(ctx context.Context, path path
 
 		var elem attr.Value
 		var attrDiags diag.Diagnostics
-		if kubernetesElem, ok := t.ElemType.(KubernetesType); ok {
-			elem, attrDiags = kubernetesElem.ValueFromUnstructured(ctx, elemPath, value)
+
+		var p fieldpath.PathElement
+		if t.Keys != nil {
+			key := make(diffvalue.FieldList, 0, len(t.Keys))
+			obj := value.(map[string]interface{})
+			for _, k := range t.Keys {
+				v := diffvalue.NewValueInterface(obj[k])
+				key = append(key, diffvalue.Field{Name: k, Value: v})
+			}
+			p = fieldpath.PathElement{Key: &key}
 		} else {
-			elem, attrDiags = primitiveFromUnstructured(ctx, elemPath, t.ElemType, value)
+			p = fieldpath.PathElement{Index: &i}
 		}
+
+		if kubernetesElemType, ok := t.ElemType.(KubernetesType); ok {
+			if fields == nil || fields.Members.Has(p) {
+				elem, attrDiags = kubernetesElemType.ValueFromUnstructured(ctx, elemPath, nil, value)
+			} else if childFields, found := fields.Children.Get(p); found {
+				elem, attrDiags = kubernetesElemType.ValueFromUnstructured(ctx, elemPath, childFields, value)
+			} else {
+				continue
+			}
+		} else {
+			if fields == nil || fields.Members.Has(p) {
+				elem, attrDiags = primitiveFromUnstructured(ctx, elemPath, t.ElemType, value)
+			} else {
+				continue
+			}
+		}
+
 		diags.Append(attrDiags...)
 		if attrDiags.HasError() {
 			continue
@@ -131,12 +160,21 @@ func ListFromOpenApi(root *spec3.OpenAPI, openapi spec.Schema, path []string) (K
 		return nil, fmt.Errorf("expected map of items at %s", strings.Join(path, ""))
 	}
 
+	extensions := openapi.VendorExtensible.Extensions
+	listType := extensions["x-kubernetes-list-type"].(string)
+	var keys []string
+	if listType == "map" {
+		for _, k := range extensions["x-kubernetes-list-map-keys"].([]interface{}) {
+			keys = append(keys, k.(string))
+		}
+	}
+
 	elemType, err := OpenApiToTfType(root, *items, append(path, "[*]"))
 	if err != nil {
 		return nil, err
 	}
 
-	return KubernetesListType{ListType: basetypes.ListType{ElemType: elemType}}, nil
+	return KubernetesListType{ListType: basetypes.ListType{ElemType: elemType}, Keys: keys}, nil
 }
 
 var _ basetypes.ListTypable = KubernetesListType{}
@@ -144,6 +182,8 @@ var _ KubernetesType = KubernetesListType{}
 
 type KubernetesListValue struct {
 	basetypes.ListValue
+
+	keys []string
 }
 
 func (v KubernetesListValue) ToUnstructured(ctx context.Context, path path.Path) (interface{}, diag.Diagnostics) {
@@ -177,7 +217,7 @@ func (v KubernetesListValue) Equal(o attr.Value) bool {
 }
 
 func (v KubernetesListValue) Type(ctx context.Context) attr.Type {
-	return KubernetesListType{ListType: basetypes.ListType{ElemType: v.ElementType(ctx)}}
+	return KubernetesListType{ListType: basetypes.ListType{ElemType: v.ElementType(ctx)}, Keys: v.keys}
 }
 
 func (v *KubernetesListValue) FillNulls(ctx context.Context, path path.Path, config attr.Value) diag.Diagnostics {

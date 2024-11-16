@@ -14,13 +14,14 @@ import (
 	strcase "github.com/stoewer/go-strcase"
 	"k8s.io/kube-openapi/pkg/spec3"
 	"k8s.io/kube-openapi/pkg/validation/spec"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 type KubernetesType interface {
 	attr.Type
 
 	SchemaType(ctx context.Context, isRequired bool) (schema.Attribute, error)
-	ValueFromUnstructured(ctx context.Context, path path.Path, obj interface{}) (attr.Value, diag.Diagnostics)
+	ValueFromUnstructured(ctx context.Context, path path.Path, fields *fieldpath.Set, obj interface{}) (attr.Value, diag.Diagnostics)
 }
 
 type KubernetesObjectType struct {
@@ -76,7 +77,12 @@ func (t KubernetesObjectType) ValueType(ctx context.Context) attr.Value {
 	}
 }
 
-func (t KubernetesObjectType) ValueFromUnstructured(ctx context.Context, path path.Path, obj interface{}) (attr.Value, diag.Diagnostics) {
+func (t KubernetesObjectType) ValueFromUnstructured(
+	ctx context.Context,
+	path path.Path,
+	fields *fieldpath.Set,
+	obj interface{},
+) (attr.Value, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	if obj == nil {
 		obj = make(map[string]interface{}, 0)
@@ -103,19 +109,33 @@ func (t KubernetesObjectType) ValueFromUnstructured(ctx context.Context, path pa
 			attributes[k] = newNull(ctx, attrType)
 			continue
 		}
-		value, found := mapObj[fieldName]
-		if !found || value == nil {
-			attributes[k] = newNull(ctx, attrType)
-			continue
-		}
 
 		var attr attr.Value
 		var attrDiags diag.Diagnostics
 
+		value := mapObj[fieldName]
+		if value == nil {
+			attributes[k] = newNull(ctx, attrType)
+			continue
+		}
+
+		p := fieldpath.PathElement{FieldName: &fieldName}
 		if kubernetesAttrType, ok := attrType.(KubernetesType); ok {
-			attr, attrDiags = kubernetesAttrType.ValueFromUnstructured(ctx, fieldPath, value)
+			if fields == nil || fields.Members.Has(p) {
+				attr, attrDiags = kubernetesAttrType.ValueFromUnstructured(ctx, fieldPath, nil, value)
+			} else if childFields, found := fields.Children.Get(p); found {
+				attr, attrDiags = kubernetesAttrType.ValueFromUnstructured(ctx, fieldPath, childFields, value)
+			} else {
+				attributes[k] = newNull(ctx, attrType)
+				continue
+			}
 		} else {
-			attr, attrDiags = primitiveFromUnstructured(ctx, fieldPath, attrType, value)
+			if fields == nil || fields.Members.Has(p) {
+				attr, attrDiags = primitiveFromUnstructured(ctx, fieldPath, attrType, value)
+			} else {
+				attributes[k] = newNull(ctx, attrType)
+				continue
+			}
 		}
 		diags.Append(attrDiags...)
 		if attrDiags.HasError() {
