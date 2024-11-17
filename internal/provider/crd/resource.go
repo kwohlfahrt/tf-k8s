@@ -207,6 +207,10 @@ func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, 
 		resp.Diagnostics.AddError("Unable to create resource", err.Error())
 		return
 	}
+
+	// TODO: Should we unset the existing field-manager? Should we
+	// unconditionally do that on import (currently, Update only runs if there
+	// are changes)?
 	resp.Private.SetKey(ctx, "import-field-managers", nil)
 
 	fields, diags := generic.GetManagedFieldSet(obj, fieldManager)
