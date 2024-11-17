@@ -3,10 +3,8 @@ package generic
 import (
 	"bytes"
 	"context"
-	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
-	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -14,46 +12,26 @@ import (
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
-func ObjectToState(ctx context.Context, typ types.KubernetesObjectType, obj unstructured.Unstructured, fieldManager string) (types.KubernetesValue, diag.Diagnostics) {
-	var diags diag.Diagnostics
-
-	fields, fieldsDiags := getManagedFieldSet(&obj, fieldManager)
-	diags.Append(fieldsDiags...)
-	if diags.HasError() {
-		return nil, diags
-	}
-
-	value, valueDiags := typ.ValueFromUnstructured(ctx, path.Empty(), fields, obj.UnstructuredContent())
-	diags.Append(valueDiags...)
-	if valueDiags.HasError() {
-		return nil, diags
-	}
-	kubernetesValue, ok := value.(*types.KubernetesObjectValue)
-	if !ok {
-		diags.AddError(
-			"Unexpected value type",
-			fmt.Sprintf("Expected KubernetesObjectValue, got %T. This is a provider-internal error.", value),
-		)
-	}
-
-	return kubernetesValue, diags
-}
-
 type PlanOrState interface {
 	Get(ctx context.Context, target interface{}) diag.Diagnostics
 }
 
-func FillNulls(ctx context.Context, value types.KubernetesValue, state PlanOrState) diag.Diagnostics {
+func StateToValue(ctx context.Context, state PlanOrState, typeInfo TypeInfo) (types.KubernetesValue, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
 	var stateValue basetypes.ObjectValue
 	diags.Append(state.Get(ctx, &stateValue)...)
 	if diags.HasError() {
-		return diags
+		return nil, diags
 	}
 
-	diags.Append(value.FillNulls(ctx, path.Empty(), stateValue)...)
-	return diags
+	value, valueDiags := typeInfo.Schema.ValueFromObject(ctx, stateValue)
+	diags.Append(valueDiags...)
+	if diags.HasError() {
+		return nil, diags
+	}
+	objectValue := value.(*types.KubernetesObjectValue)
+	return objectValue, diags
 }
 
 var defaultFields fieldpath.Set
@@ -76,7 +54,7 @@ func init() {
 	})
 }
 
-func getManagedFieldSet(in *unstructured.Unstructured, fieldManager string) (*fieldpath.Set, diag.Diagnostics) {
+func GetManagedFieldSet(in *unstructured.Unstructured, fieldManager string) (*fieldpath.Set, diag.Diagnostics) {
 	var entry *v1.ManagedFieldsEntry
 	for _, maybeEntry := range in.GetManagedFields() {
 		if maybeEntry.Manager == fieldManager && maybeEntry.Operation == v1.ManagedFieldsOperationApply {
@@ -92,5 +70,5 @@ func getManagedFieldSet(in *unstructured.Unstructured, fieldManager string) (*fi
 		}
 	}
 	fieldSet = fieldSet.Union(&defaultFields)
-	return fieldSet.Leaves(), nil
+	return fieldSet, nil
 }

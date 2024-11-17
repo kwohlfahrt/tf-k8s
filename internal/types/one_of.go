@@ -131,12 +131,14 @@ func (v KubernetesUnionValue) Type(context.Context) attr.Type {
 	return KubernetesUnionType{Members: v.MemberTypes}
 }
 
-func (v KubernetesUnionValue) FillNulls(ctx context.Context, path path.Path, config attr.Value) diag.Diagnostics {
-	var diags diag.Diagnostics
-
-	// TODO
-
-	return diags
+func (v KubernetesUnionValue) ManagedFields(ctx context.Context, path path.Path, fields *fieldpath.Set, pe *fieldpath.PathElement) diag.Diagnostics {
+	val := v.DynamicValue.UnderlyingValue()
+	if kubernetesVal, ok := val.(KubernetesValue); ok {
+		return kubernetesVal.ManagedFields(ctx, path, fields, pe)
+	} else {
+		fields.Insert([]fieldpath.PathElement{*pe})
+		return nil
+	}
 }
 
 var _ basetypes.DynamicValuable = KubernetesUnionValue{}

@@ -74,7 +74,12 @@ func (c *crdResource) Create(ctx context.Context, req tfresource.CreateRequest, 
 		return
 	}
 
-	planObj, diags := generic.StateToObject(ctx, req.Plan, c.typeInfo)
+	state, diags := generic.StateToValue(ctx, req.Plan, c.typeInfo)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	planObj, diags := generic.ValueToUnstructured(ctx, state, c.typeInfo)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -90,13 +95,22 @@ func (c *crdResource) Create(ctx context.Context, req tfresource.CreateRequest, 
 		return
 	}
 
-	state, diags := generic.ObjectToState(ctx, c.typeInfo.Schema, *obj, fieldManager)
+	fields, diags := generic.GetManagedFieldSet(obj, fieldManager)
+	resp.Diagnostics.Append(diags...)
+	if diags.HasError() {
+		return
+	}
+	diags = state.ManagedFields(ctx, path.Empty(), fields, nil)
+	resp.Diagnostics.Append(diags...)
+	if diags.HasError() {
+		return
+	}
+	state, diags = generic.UnstructuredToValue(ctx, c.typeInfo.Schema, *obj, fields.Leaves())
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
 	}
 
-	diags = generic.FillNulls(ctx, state, req.Plan)
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
@@ -114,6 +128,11 @@ func (c *crdResource) Read(ctx context.Context, req tfresource.ReadRequest, resp
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	state, diags := generic.StateToValue(ctx, req.State, c.typeInfo)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	obj, err := c.typeInfo.Interface(c.client, namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
@@ -125,13 +144,23 @@ func (c *crdResource) Read(ctx context.Context, req tfresource.ReadRequest, resp
 		return
 	}
 
-	state, diags := generic.ObjectToState(ctx, c.typeInfo.Schema, *obj, fieldManager)
+	fields, diags := generic.GetManagedFieldSet(obj, fieldManager)
+	resp.Diagnostics.Append(diags...)
+	if diags.HasError() {
+		return
+	}
+	diags = state.ManagedFields(ctx, path.Empty(), fields, nil)
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
 	}
 
-	diags = generic.FillNulls(ctx, state, req.State)
+	state, diags = generic.UnstructuredToValue(ctx, c.typeInfo.Schema, *obj, fields.Leaves())
+	resp.Diagnostics.Append(diags...)
+	if diags.HasError() {
+		return
+	}
+
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
@@ -150,7 +179,12 @@ func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, 
 		return
 	}
 
-	obj, diags := generic.StateToObject(ctx, req.Plan, c.typeInfo)
+	state, diags := generic.StateToValue(ctx, req.Plan, c.typeInfo)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	obj, diags := generic.ValueToUnstructured(ctx, state, c.typeInfo)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -164,7 +198,18 @@ func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, 
 		return
 	}
 
-	state, diags := generic.ObjectToState(ctx, c.typeInfo.Schema, *obj, fieldManager)
+	fields, diags := generic.GetManagedFieldSet(obj, fieldManager)
+	resp.Diagnostics.Append(diags...)
+	if diags.HasError() {
+		return
+	}
+	diags = state.ManagedFields(ctx, path.Empty(), fields, nil)
+	resp.Diagnostics.Append(diags...)
+	if diags.HasError() {
+		return
+	}
+
+	state, diags = generic.UnstructuredToValue(ctx, c.typeInfo.Schema, *obj, fields.Leaves())
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return

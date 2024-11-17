@@ -113,8 +113,9 @@ func (t KubernetesObjectType) ValueFromUnstructured(
 		var attr attr.Value
 		var attrDiags diag.Diagnostics
 
-		value := mapObj[fieldName]
-		if value == nil {
+		value, found := mapObj[fieldName]
+		// Handle the parsing/datasource case, where we don't have a field-manager
+		if fields == nil && (!found || value == nil) {
 			attributes[k] = newNull(ctx, attrType)
 			continue
 		}
@@ -279,7 +280,7 @@ type KubernetesValue interface {
 	attr.Value
 
 	ToUnstructured(ctx context.Context, path path.Path) (interface{}, diag.Diagnostics)
-	FillNulls(ctx context.Context, path path.Path, config attr.Value) diag.Diagnostics
+	ManagedFields(ctx context.Context, path path.Path, fields *fieldpath.Set, pe *fieldpath.PathElement) diag.Diagnostics
 }
 
 type KubernetesObjectValue struct {
@@ -373,38 +374,36 @@ func DynamicObjectFromUnstructured(ctx context.Context, path path.Path, val map[
 	return obj, diags
 }
 
-func (v *KubernetesObjectValue) FillNulls(ctx context.Context, path path.Path, config attr.Value) diag.Diagnostics {
+func (v KubernetesObjectValue) ManagedFields(ctx context.Context, path path.Path, fields *fieldpath.Set, pe *fieldpath.PathElement) diag.Diagnostics {
 	var diags diag.Diagnostics
 
-	var kubernetesConfig *KubernetesObjectValue
-	switch config := config.(type) {
-	case basetypes.ObjectValue:
-		baseConfig, diags := v.Type(ctx).(KubernetesObjectType).ValueFromObject(ctx, config)
-		if diags.HasError() {
-			return diags
-		}
-		kubernetesConfig = baseConfig.(*KubernetesObjectValue)
-	case *KubernetesObjectValue:
-		kubernetesConfig = config
-	default:
-		diags.Append(diag.NewAttributeErrorDiagnostic(
-			path, "Unexpected value type",
-			fmt.Sprintf("Expected ObjectValue, got %T", config),
-		))
-		return diags
+	if pe != nil {
+		fields = fields.Children.Descend(*pe)
 	}
 
-	configAttrs := kubernetesConfig.Attributes()
-	for k, fieldValue := range v.Attributes() {
+	for k, attr := range v.Attributes() {
+		if attr.IsNull() {
+			continue
+		}
+
 		fieldPath := path.AtName(k)
-		if kubernetesFieldValue, ok := fieldValue.(KubernetesValue); ok {
-			attr := configAttrs[k]
-			diags.Append(kubernetesFieldValue.FillNulls(ctx, fieldPath, attr)...)
+		fieldName, found := v.fieldNames[k]
+		if !found {
+			diags.Append(diag.NewAttributeErrorDiagnostic(
+				fieldPath, "Unexpected field",
+				"Field does not have a mapping to a Kubernetes property. This is a provider-internal error, please report it!",
+			))
+			continue
+		}
+		pathElem := fieldpath.PathElement{FieldName: &fieldName}
+		if kubernetesAttr, ok := attr.(KubernetesValue); ok {
+			diags.Append(kubernetesAttr.ManagedFields(ctx, fieldPath, fields, &pathElem)...)
+		} else {
+			fields.Insert([]fieldpath.PathElement{pathElem})
 		}
 	}
-
 	return diags
 }
 
 var _ basetypes.ObjectValuable = KubernetesObjectValue{}
-var _ KubernetesValue = &KubernetesObjectValue{}
+var _ KubernetesValue = KubernetesObjectValue{}
