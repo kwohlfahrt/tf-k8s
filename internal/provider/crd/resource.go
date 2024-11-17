@@ -11,6 +11,7 @@ import (
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/generic"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 )
 
@@ -242,13 +243,25 @@ func (c *crdResource) Delete(ctx context.Context, req tfresource.DeleteRequest, 
 		return
 	}
 
-	err := c.typeInfo.Interface(c.client, namespace).Delete(ctx, name, metav1.DeleteOptions{})
+	fieldSelector := fmt.Sprintf("metadata.name=%s", name)
+	w, err := c.client.Resource(c.typeInfo.GroupVersionResource()).Watch(ctx, metav1.ListOptions{FieldSelector: fieldSelector})
+	if err != nil {
+		resp.Diagnostics.AddError("Unable to watch resource for deletion", err.Error())
+		return
+	}
+	defer w.Stop()
+
+	err = c.typeInfo.Interface(c.client, namespace).Delete(ctx, name, metav1.DeleteOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		resp.Diagnostics.AddError("Unable to delete resource", err.Error())
 		return
 	}
-	// TODO: Should we wait for the resource to be gone? All of the watch utils
-	// seem to assume a controller setup, with informers/caches/etc.
+
+	for event := range w.ResultChan() {
+		if event.Type == watch.Deleted {
+			break
+		}
+	}
 }
 
 func (c *crdResource) ImportState(ctx context.Context, req tfresource.ImportStateRequest, resp *tfresource.ImportStateResponse) {
