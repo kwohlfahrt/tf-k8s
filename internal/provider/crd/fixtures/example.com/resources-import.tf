@@ -17,5 +17,5 @@ resource "k8scrd_foo_example_com_v1" "baz" {
 
 import {
   to = k8scrd_foo_example_com_v1.baz
-  id = "default/baz"
+  id = "kubectl:default/baz"
 }

@@ -3,6 +3,8 @@ package generic
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
@@ -32,6 +34,33 @@ func StateToValue(ctx context.Context, state PlanOrState, typeInfo TypeInfo) (ty
 	}
 	objectValue := value.(*types.KubernetesObjectValue)
 	return objectValue, diags
+}
+
+type PrivateState interface {
+	GetKey(ctx context.Context, key string) ([]byte, diag.Diagnostics)
+}
+
+func GetImportFieldManager(ctx context.Context, private PrivateState, key string) (*string, diag.Diagnostics) {
+	serialized, diags := private.GetKey(ctx, key)
+	if diags.HasError() || serialized == nil {
+		return nil, diags
+	}
+
+	fieldManagers := make([]string, 0)
+	err := json.Unmarshal(serialized, &fieldManagers)
+	if err != nil {
+		diags.AddError("Error unmarshalling import field managers", fmt.Sprintf("expected valid JSON, got %v", serialized))
+		return nil, diags
+	}
+
+	if len(fieldManagers) != 1 {
+		diags.AddError(
+			"Too many field managers for import",
+			fmt.Sprintf("Only one field manager is supported for import, got %v", fieldManagers),
+		)
+	}
+
+	return &fieldManagers[0], diags
 }
 
 var defaultFields fieldpath.Set

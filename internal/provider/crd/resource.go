@@ -2,6 +2,7 @@ package crd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -132,6 +133,11 @@ func (c *crdResource) Read(ctx context.Context, req tfresource.ReadRequest, resp
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	importFieldManager, diags := generic.GetImportFieldManager(ctx, req.Private, "import-field-managers")
+	resp.Diagnostics.Append(diags...)
+	if diags.HasError() {
+		return
+	}
 
 	obj, err := c.typeInfo.Interface(c.client, namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
@@ -143,7 +149,12 @@ func (c *crdResource) Read(ctx context.Context, req tfresource.ReadRequest, resp
 		return
 	}
 
-	fields, diags := generic.GetManagedFieldSet(obj, fieldManager)
+	readFieldManager := fieldManager
+	if importFieldManager != nil {
+		readFieldManager = *importFieldManager
+	}
+
+	fields, diags := generic.GetManagedFieldSet(obj, readFieldManager)
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
@@ -236,17 +247,34 @@ func (c *crdResource) Delete(ctx context.Context, req tfresource.DeleteRequest, 
 }
 
 func (c *crdResource) ImportState(ctx context.Context, req tfresource.ImportStateRequest, resp *tfresource.ImportStateResponse) {
+	components := strings.SplitN(req.ID, ":", 2)
+	if len(components) != 2 {
+		resp.Diagnostics.AddError("Invalid import ID", fmt.Sprintf("expected fieldManagers:resource import, got %s", req.ID))
+		return
+	}
+
+	fieldManagers := strings.Split(components[0], ",")
+	resource := components[1]
+
+	state, err := json.Marshal(fieldManagers)
+	if err != nil {
+		resp.Diagnostics.AddError("Unable to marshal fieldManagers", err.Error())
+		return
+	}
+
 	if c.typeInfo.Namespaced {
-		components := strings.SplitN(req.ID, "/", 2)
+		components = strings.SplitN(resource, "/", 2)
 		if len(components) != 2 {
-			resp.Diagnostics.AddError("Invalid import ID", fmt.Sprintf("expected 2 components, got %d", len(components)))
+			resp.Diagnostics.AddError("Invalid import ID", fmt.Sprintf("expected namespace/name resource, got %s", resource))
 			return
 		}
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("metadata").AtName("namespace"), components[0])...)
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("metadata").AtName("name"), components[1])...)
 	} else {
-		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("metadata").AtName("name"), req.ID)...)
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("metadata").AtName("name"), resource)...)
 	}
+
+	resp.Private.SetKey(ctx, "import-field-managers", state)
 }
 
 var (

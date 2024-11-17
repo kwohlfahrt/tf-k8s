@@ -30,7 +30,7 @@ resource "k8scrd_deployment_apps_v1" "baz" {
 
 import {
   to = k8scrd_deployment_apps_v1.baz
-  id = "default/baz"
+  id = "kubectl:default/baz"
 }
 
 resource "k8scrd_namespace_v1" "baz" {
@@ -39,5 +39,5 @@ resource "k8scrd_namespace_v1" "baz" {
 
 import {
   to = k8scrd_namespace_v1.baz
-  id = "baz"
+  id = "kubectl:baz"
 }
