@@ -207,6 +207,7 @@ func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, 
 		resp.Diagnostics.AddError("Unable to create resource", err.Error())
 		return
 	}
+	resp.Private.SetKey(ctx, "import-field-managers", nil)
 
 	fields, diags := generic.GetManagedFieldSet(obj, fieldManager)
 	resp.Diagnostics.Append(diags...)
