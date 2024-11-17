@@ -113,8 +113,9 @@ func (t KubernetesObjectType) ValueFromUnstructured(
 		var attr attr.Value
 		var attrDiags diag.Diagnostics
 
-		value := mapObj[fieldName]
-		if value == nil {
+		value, found := mapObj[fieldName]
+		// Handle the parsing/datasource case, where we don't have a field-manager
+		if fields == nil && (!found || value == nil) {
 			attributes[k] = newNull(ctx, attrType)
 			continue
 		}
@@ -280,7 +281,6 @@ type KubernetesValue interface {
 
 	ToUnstructured(ctx context.Context, path path.Path) (interface{}, diag.Diagnostics)
 	ManagedFields(ctx context.Context, path path.Path, fields *fieldpath.Set, pe *fieldpath.PathElement) diag.Diagnostics
-	FillNulls(ctx context.Context, path path.Path, config attr.Value) diag.Diagnostics
 }
 
 type KubernetesObjectValue struct {
@@ -405,38 +405,5 @@ func (v KubernetesObjectValue) ManagedFields(ctx context.Context, path path.Path
 	return diags
 }
 
-func (v *KubernetesObjectValue) FillNulls(ctx context.Context, path path.Path, config attr.Value) diag.Diagnostics {
-	var diags diag.Diagnostics
-
-	var kubernetesConfig *KubernetesObjectValue
-	switch config := config.(type) {
-	case basetypes.ObjectValue:
-		baseConfig, diags := v.Type(ctx).(KubernetesObjectType).ValueFromObject(ctx, config)
-		if diags.HasError() {
-			return diags
-		}
-		kubernetesConfig = baseConfig.(*KubernetesObjectValue)
-	case *KubernetesObjectValue:
-		kubernetesConfig = config
-	default:
-		diags.Append(diag.NewAttributeErrorDiagnostic(
-			path, "Unexpected value type",
-			fmt.Sprintf("Expected ObjectValue, got %T", config),
-		))
-		return diags
-	}
-
-	configAttrs := kubernetesConfig.Attributes()
-	for k, fieldValue := range v.Attributes() {
-		fieldPath := path.AtName(k)
-		if kubernetesFieldValue, ok := fieldValue.(KubernetesValue); ok {
-			attr := configAttrs[k]
-			diags.Append(kubernetesFieldValue.FillNulls(ctx, fieldPath, attr)...)
-		}
-	}
-
-	return diags
-}
-
 var _ basetypes.ObjectValuable = KubernetesObjectValue{}
-var _ KubernetesValue = &KubernetesObjectValue{}
+var _ KubernetesValue = KubernetesObjectValue{}

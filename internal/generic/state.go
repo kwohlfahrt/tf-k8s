@@ -5,7 +5,6 @@ import (
 	"context"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
-	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,19 +32,6 @@ func StateToValue(ctx context.Context, state PlanOrState, typeInfo TypeInfo) (ty
 	}
 	objectValue := value.(*types.KubernetesObjectValue)
 	return objectValue, diags
-}
-
-func FillNulls(ctx context.Context, value types.KubernetesValue, state PlanOrState) diag.Diagnostics {
-	var diags diag.Diagnostics
-
-	var stateValue basetypes.ObjectValue
-	diags.Append(state.Get(ctx, &stateValue)...)
-	if diags.HasError() {
-		return diags
-	}
-
-	diags.Append(value.FillNulls(ctx, path.Empty(), stateValue)...)
-	return diags
 }
 
 var defaultFields fieldpath.Set
@@ -84,5 +70,5 @@ func GetManagedFieldSet(in *unstructured.Unstructured, fieldManager string) (*fi
 		}
 	}
 	fieldSet = fieldSet.Union(&defaultFields)
-	return fieldSet.Leaves(), nil
+	return fieldSet, nil
 }

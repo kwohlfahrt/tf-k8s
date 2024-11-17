@@ -68,6 +68,10 @@ func (t KubernetesMapType) ValueFromUnstructured(
 	obj interface{},
 ) (attr.Value, diag.Diagnostics) {
 	var diags diag.Diagnostics
+	if obj == nil {
+		obj = make(map[string]interface{}, 0)
+	}
+
 	mapObj, ok := obj.(map[string]interface{})
 	if !ok {
 		diags.Append(diag.NewAttributeErrorDiagnostic(
@@ -197,43 +201,6 @@ func (v KubernetesMapValue) Type(ctx context.Context) attr.Type {
 	return KubernetesMapType{MapType: basetypes.MapType{ElemType: v.ElementType(ctx)}}
 }
 
-func (v *KubernetesMapValue) FillNulls(ctx context.Context, path path.Path, config attr.Value) diag.Diagnostics {
-	var diags diag.Diagnostics
-
-	var kubernetesConfig *KubernetesMapValue
-	switch config := config.(type) {
-	case basetypes.MapValue:
-		baseConfig, diags := v.Type(ctx).(KubernetesMapType).ValueFromMap(ctx, config)
-		if diags.HasError() {
-			return diags
-		}
-		kubernetesConfig = baseConfig.(*KubernetesMapValue)
-	case *KubernetesMapValue:
-		kubernetesConfig = config
-	default:
-		diags.Append(diag.NewAttributeErrorDiagnostic(
-			path, "Unexpected value type",
-			fmt.Sprintf("Expected MapValue, got %T", config),
-		))
-		return diags
-	}
-
-	configElements := kubernetesConfig.Elements()
-	if v.IsNull() && !kubernetesConfig.IsNull() && len(configElements) == 0 {
-		v.MapValue, diags = basetypes.NewMapValue(v.ElementType(ctx), map[string]attr.Value{})
-	} else if !v.IsNull() && kubernetesConfig.IsNull() && len(v.Elements()) == 0 {
-		v.MapValue = basetypes.NewMapNull(v.ElementType(ctx))
-	} else {
-		for k, v := range v.Elements() {
-			if kubernetesValue, ok := v.(KubernetesValue); ok {
-				kubernetesValue.FillNulls(ctx, path.AtMapKey(k), configElements[k])
-			}
-		}
-	}
-
-	return diags
-}
-
 func (v KubernetesMapValue) ManagedFields(ctx context.Context, path path.Path, fields *fieldpath.Set, pe *fieldpath.PathElement) diag.Diagnostics {
 	var diags diag.Diagnostics
 
@@ -256,4 +223,4 @@ func (v KubernetesMapValue) ManagedFields(ctx context.Context, path path.Path, f
 }
 
 var _ basetypes.MapValuable = KubernetesMapValue{}
-var _ KubernetesValue = &KubernetesMapValue{}
+var _ KubernetesValue = KubernetesMapValue{}

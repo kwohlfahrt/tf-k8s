@@ -99,13 +99,17 @@ func (c *crdResource) Create(ctx context.Context, req tfresource.CreateRequest, 
 	if diags.HasError() {
 		return
 	}
-	state, diags = generic.UnstructuredToValue(ctx, c.typeInfo.Schema, *obj, fields)
+	diags = state.ManagedFields(ctx, path.Empty(), fields, nil)
+	resp.Diagnostics.Append(diags...)
+	if diags.HasError() {
+		return
+	}
+	state, diags = generic.UnstructuredToValue(ctx, c.typeInfo.Schema, *obj, fields.Leaves())
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
 	}
 
-	diags = generic.FillNulls(ctx, state, req.Plan)
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
@@ -120,6 +124,11 @@ func (c *crdResource) Read(ctx context.Context, req tfresource.ReadRequest, resp
 	if c.typeInfo.Namespaced {
 		resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("metadata").AtName("namespace"), &namespace)...)
 	}
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	state, diags := generic.StateToValue(ctx, req.State, c.typeInfo)
+	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -139,14 +148,18 @@ func (c *crdResource) Read(ctx context.Context, req tfresource.ReadRequest, resp
 	if diags.HasError() {
 		return
 	}
-
-	state, diags := generic.UnstructuredToValue(ctx, c.typeInfo.Schema, *obj, fields)
+	diags = state.ManagedFields(ctx, path.Empty(), fields, nil)
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
 	}
 
-	diags = generic.FillNulls(ctx, state, req.State)
+	state, diags = generic.UnstructuredToValue(ctx, c.typeInfo.Schema, *obj, fields.Leaves())
+	resp.Diagnostics.Append(diags...)
+	if diags.HasError() {
+		return
+	}
+
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
@@ -189,7 +202,13 @@ func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, 
 	if diags.HasError() {
 		return
 	}
-	state, diags = generic.UnstructuredToValue(ctx, c.typeInfo.Schema, *obj, fields)
+	diags = state.ManagedFields(ctx, path.Empty(), fields, nil)
+	resp.Diagnostics.Append(diags...)
+	if diags.HasError() {
+		return
+	}
+
+	state, diags = generic.UnstructuredToValue(ctx, c.typeInfo.Schema, *obj, fields.Leaves())
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
