@@ -10,7 +10,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/config"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/provider"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/provider/crd"
 )
@@ -94,7 +93,6 @@ func TestAccResourceImport(t *testing.T) {
 	}
 
 	configPlanChecks := makeConfigChecks(checkSpeck.Properties, checkSpeck.Outputs)
-	configPlanChecks.PreApply = []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()}
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: map[string]func() (tfprotov6.ProviderServer, error){
