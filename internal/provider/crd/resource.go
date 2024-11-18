@@ -133,6 +133,7 @@ func (c *crdResource) Create(ctx context.Context, req tfresource.CreateRequest, 
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("metadata").AtName("field_manager"), fieldManager)...)
 }
 
 func (c *crdResource) Read(ctx context.Context, req tfresource.ReadRequest, resp *tfresource.ReadResponse) {
