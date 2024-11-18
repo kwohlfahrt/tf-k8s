@@ -8,7 +8,11 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	tfresource "github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/generic"
+	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
@@ -41,6 +45,16 @@ func (c *crdResource) Schema(ctx context.Context, req tfresource.SchemaRequest, 
 		resp.Diagnostics.AddError("Could not convert CRD to schema", err.Error())
 		return
 	}
+
+	meta := result.Attributes["metadata"].(schema.SingleNestedAttribute)
+	meta.Attributes["field_manager"] = schema.StringAttribute{
+		Required: false,
+		Computed: true,
+		Default:  stringdefault.StaticString(fieldManager),
+	}
+	metaType := meta.CustomType.(types.KubernetesObjectType)
+	metaType.AttrTypes["field_manager"] = basetypes.StringType{}
+	metaType.InternalFields["field_manager"] = true
 
 	resp.Schema = *result
 }
@@ -231,6 +245,7 @@ func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, 
 		return
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("metadata").AtName("field_manager"), fieldManager)...)
 }
 
 func (c *crdResource) Delete(ctx context.Context, req tfresource.DeleteRequest, resp *tfresource.DeleteResponse) {
