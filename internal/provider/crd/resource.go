@@ -15,6 +15,7 @@ import (
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 )
@@ -192,6 +193,11 @@ func (c *crdResource) Read(ctx context.Context, req tfresource.ReadRequest, resp
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
+	if importFieldManager != nil {
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("metadata").AtName("field_manager"), importFieldManager)...)
+	} else {
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("metadata").AtName("field_manager"), fieldManager)...)
+	}
 }
 
 func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, resp *tfresource.UpdateResponse) {
@@ -209,6 +215,12 @@ func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, 
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	importFieldManager, diags := generic.GetImportFieldManager(ctx, req.Private, "import-field-managers")
+	resp.Diagnostics.Append(diags...)
+	if diags.HasError() {
+		return
+	}
+
 	obj, diags := generic.ValueToUnstructured(ctx, state, c.typeInfo)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -223,10 +235,19 @@ func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, 
 		return
 	}
 
-	// TODO: Should we unset the existing field-manager? Should we
-	// unconditionally do that on import (currently, Update only runs if there
-	// are changes)?
-	resp.Private.SetKey(ctx, "import-field-managers", nil)
+	if importFieldManager != nil {
+		empty := unstructured.Unstructured{Object: map[string]interface{}{
+			"apiVersion": c.typeInfo.GroupVersionResource().GroupVersion().String(),
+			"kind":       c.typeInfo.Kind,
+			"metadata":   map[string]interface{}{"name": name, "namespace": namespace},
+		}}
+		_, err := c.typeInfo.Interface(c.client, namespace).Apply(ctx, name, &empty, metav1.ApplyOptions{FieldManager: *importFieldManager})
+		if err != nil {
+			resp.Diagnostics.AddError("Unable to remove imported fieldManager", err.Error())
+			return
+		}
+		resp.Private.SetKey(ctx, "import-field-managers", nil)
+	}
 
 	fields, diags := generic.GetManagedFieldSet(obj, fieldManager)
 	resp.Diagnostics.Append(diags...)
