@@ -27,7 +27,36 @@ type crdResource struct {
 }
 
 func NewResource(typeInfo generic.TypeInfo) tfresource.Resource {
-	return &crdResource{typeInfo: typeInfo}
+	schema := types.KubernetesObjectType{
+		ObjectType: basetypes.ObjectType{
+			AttrTypes: maps.Clone(typeInfo.Schema.AttrTypes),
+		},
+		FieldNames:     typeInfo.Schema.FieldNames,
+		InternalFields: typeInfo.Schema.InternalFields,
+		RequiredFields: typeInfo.Schema.RequiredFields,
+	}
+
+	metadata := schema.AttrTypes["metadata"].(types.KubernetesObjectType)
+	metadata = types.KubernetesObjectType{
+		ObjectType: basetypes.ObjectType{
+			AttrTypes: maps.Clone(metadata.AttrTypes),
+		},
+		FieldNames:     maps.Clone(metadata.FieldNames),
+		RequiredFields: maps.Clone(metadata.RequiredFields),
+		InternalFields: maps.Clone(metadata.InternalFields),
+	}
+	metadata.AttrTypes["field_manager"] = basetypes.StringType{}
+	metadata.InternalFields["field_manager"] = true
+	schema.AttrTypes["metadata"] = metadata
+
+	return &crdResource{typeInfo: generic.TypeInfo{
+		Group:      typeInfo.Group,
+		Resource:   typeInfo.Resource,
+		Kind:       typeInfo.Kind,
+		Version:    typeInfo.Version,
+		Namespaced: typeInfo.Namespaced,
+		Schema:     schema,
+	}}
 }
 
 func (c *crdResource) Metadata(ctx context.Context, req tfresource.MetadataRequest, resp *tfresource.MetadataResponse) {
@@ -48,24 +77,12 @@ func (c *crdResource) Schema(ctx context.Context, req tfresource.SchemaRequest, 
 		return
 	}
 
-	meta := result.Attributes["metadata"].(schema.SingleNestedAttribute)
-	metaType := meta.CustomType.(types.KubernetesObjectType)
-
-	meta.Attributes["field_manager"] = schema.StringAttribute{
+	metadata := result.Attributes["metadata"].(schema.SingleNestedAttribute)
+	metadata.Attributes["field_manager"] = schema.StringAttribute{
 		Required: false,
 		Computed: true,
 		Default:  stringdefault.StaticString(fieldManager),
 	}
-
-	metaType = types.KubernetesObjectType{
-		ObjectType:     basetypes.ObjectType{AttrTypes: maps.Clone(metaType.AttrTypes)},
-		FieldNames:     maps.Clone(metaType.FieldNames),
-		RequiredFields: maps.Clone(metaType.RequiredFields),
-		InternalFields: maps.Clone(metaType.InternalFields),
-	}
-	metaType.InternalFields["field_manager"] = true
-	metaType.AttrTypes["field_manager"] = basetypes.StringType{}
-	meta.CustomType = metaType
 
 	resp.Schema = *result
 }
