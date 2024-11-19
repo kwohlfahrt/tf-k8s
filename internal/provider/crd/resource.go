@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -48,14 +49,23 @@ func (c *crdResource) Schema(ctx context.Context, req tfresource.SchemaRequest, 
 	}
 
 	meta := result.Attributes["metadata"].(schema.SingleNestedAttribute)
+	metaType := meta.CustomType.(types.KubernetesObjectType)
+
 	meta.Attributes["field_manager"] = schema.StringAttribute{
 		Required: false,
 		Computed: true,
 		Default:  stringdefault.StaticString(fieldManager),
 	}
-	metaType := meta.CustomType.(types.KubernetesObjectType)
-	metaType.AttrTypes["field_manager"] = basetypes.StringType{}
+
+	metaType = types.KubernetesObjectType{
+		ObjectType:     basetypes.ObjectType{AttrTypes: maps.Clone(metaType.AttrTypes)},
+		FieldNames:     maps.Clone(metaType.FieldNames),
+		RequiredFields: maps.Clone(metaType.RequiredFields),
+		InternalFields: maps.Clone(metaType.InternalFields),
+	}
 	metaType.InternalFields["field_manager"] = true
+	metaType.AttrTypes["field_manager"] = basetypes.StringType{}
+	meta.CustomType = metaType
 
 	resp.Schema = *result
 }
