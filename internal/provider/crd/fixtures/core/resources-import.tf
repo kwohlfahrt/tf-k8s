@@ -22,6 +22,7 @@ resource "k8scrd_deployment_apps_v1" "baz" {
         containers = [{
           name  = "baz"
           image = "busybox"
+          env   = [{ name = "foo", value = "" }]
         }]
       }
     }

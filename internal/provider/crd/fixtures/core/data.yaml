@@ -46,6 +46,9 @@ spec:
       containers:
       - name: baz
         image: busybox
+        env:
+        - name: foo
+          value: ""
 ---
 apiVersion: v1
 kind: Namespace
