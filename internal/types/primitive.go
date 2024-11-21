@@ -67,6 +67,11 @@ func primitiveToUnstructured(ctx context.Context, path path.Path, val attr.Value
 func primitiveFromUnstructured(ctx context.Context, path path.Path, typ attr.Type, val interface{}) (attr.Value, diag.Diagnostics) {
 	switch typ := typ.(type) {
 	case basetypes.StringTypable:
+		if val == nil {
+			// Handle case of missing empty strings: github.com/kubernetes/kubernetes#128924.
+			// This doesn't solve the conflict when applying though.
+			val = ""
+		}
 		stringVal, ok := val.(string)
 		if !ok {
 			return nil, []diag.Diagnostic{diag.NewAttributeErrorDiagnostic(
