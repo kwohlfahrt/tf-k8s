@@ -21,8 +21,9 @@ import (
 )
 
 type crdResource struct {
-	typeInfo generic.TypeInfo
-	client   *dynamic.DynamicClient
+	typeInfo       generic.TypeInfo
+	client         *dynamic.DynamicClient
+	forceConflicts bool
 }
 
 func NewResource(typeInfo generic.TypeInfo) tfresource.Resource {
@@ -74,8 +75,8 @@ func (c *crdResource) Configure(ctx context.Context, req tfresource.ConfigureReq
 
 		return
 	}
-
 	c.client = clients.dynamic
+	c.forceConflicts = clients.forceConflicts
 }
 
 const fieldManager string = "tofu-k8scrd"
@@ -230,7 +231,10 @@ func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, 
 
 	// TODO: Validate that the object already exists. This will silently create
 	// the object if it does not already exist.
-	obj, err := c.typeInfo.Interface(c.client, namespace).Apply(ctx, name, obj, metav1.ApplyOptions{FieldManager: fieldManager})
+	obj, err := c.typeInfo.Interface(c.client, namespace).Apply(ctx, name, obj, metav1.ApplyOptions{
+		FieldManager: fieldManager,
+		Force:        c.forceConflicts,
+	})
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to create resource", err.Error())
 		return

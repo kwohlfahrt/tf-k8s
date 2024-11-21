@@ -15,7 +15,8 @@ import (
 )
 
 type Clients struct {
-	dynamic *dynamic.DynamicClient
+	dynamic        *dynamic.DynamicClient
+	forceConflicts bool
 }
 
 type CrdProvider struct {
@@ -24,7 +25,8 @@ type CrdProvider struct {
 }
 
 type CrdProviderModel struct {
-	Kubeconfig types.String `tfsdk:"kubeconfig"`
+	Kubeconfig     types.String `tfsdk:"kubeconfig"`
+	ForceConflicts types.Bool   `tfsdk:"force_conflicts"`
 }
 
 func (p *CrdProvider) Metadata(ctx context.Context, req tfprovider.MetadataRequest, resp *tfprovider.MetadataResponse) {
@@ -38,6 +40,10 @@ func (p *CrdProvider) Schema(ctx context.Context, req tfprovider.SchemaRequest, 
 			"kubeconfig": schema.StringAttribute{
 				MarkdownDescription: "Kubernetes Configuration",
 				Required:            true,
+			},
+			"force_conflicts": schema.BoolAttribute{
+				MarkdownDescription: "Force field conflicts",
+				Optional:            true,
 			},
 		},
 	}
@@ -56,7 +62,10 @@ func (p *CrdProvider) Configure(ctx context.Context, req tfprovider.ConfigureReq
 		return
 	}
 
-	clients := Clients{dynamic: dynamic}
+	clients := Clients{
+		dynamic:        dynamic,
+		forceConflicts: data.ForceConflicts.ValueBool(),
+	}
 	resp.DataSourceData = clients
 	resp.ResourceData = clients
 }
