@@ -5,7 +5,6 @@ variable "kubeconfig" {
 
 provider "k8scrd" {
   kubeconfig      = var.kubeconfig
-  force_conflicts = true
 }
 
 resource "k8scrd_deployment_apps_v1" "baz" {
