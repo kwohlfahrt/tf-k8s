@@ -1,0 +1,25 @@
+{
+    "Properties": [
+        {
+            "Name": "k8scrd_ippool_crd_projectcalico_org_v1.baz",
+            "Path": [
+                "spec",
+                "cidr"
+            ],
+            "Value": "198.51.100.4/30"
+        }
+    ],
+    "Resources": [
+        {
+            "GroupVersionResource": {
+                "group": "crd.projectcalico.org",
+                "version": "v1",
+                "resource": "ippool"
+            },
+            "Metadata": {
+                "name": "baz",
+                "namespace": "default"
+            }
+        }
+    ]
+}

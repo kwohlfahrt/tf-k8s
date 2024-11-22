@@ -1,0 +1,9 @@
+{
+    "Outputs": [
+        {
+            "Name": "ippool",
+            "Path": ["spec", "cidr"],
+            "Value": "198.51.100.0/30"
+        }
+    ]
+}

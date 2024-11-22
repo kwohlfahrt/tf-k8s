@@ -104,6 +104,8 @@ func parseValue(value interface{}) knownvalue.Check {
 		return knownvalue.Int64Exact(value)
 	case float64:
 		return knownvalue.Float64Exact(value)
+	case bool:
+		return knownvalue.Bool(value)
 	default:
 		panic("unsupported value type")
 	}
