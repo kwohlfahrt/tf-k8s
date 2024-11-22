@@ -4,7 +4,7 @@ variable "kubeconfig" {
 }
 
 provider "k8scrd" {
-  kubeconfig = var.kubeconfig
+  kubeconfig      = var.kubeconfig
 }
 
 resource "k8scrd_deployment_apps_v1" "baz" {
