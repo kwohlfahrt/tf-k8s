@@ -147,6 +147,9 @@ var _ KubernetesValue = KubernetesUnionValue{}
 func UnionFromOpenApi(root *spec3.OpenAPI, openapis spec.Schema, path []string) (KubernetesType, error) {
 	members := openapis.OneOf
 	if members == nil {
+		members = openapis.AnyOf
+	}
+	if members == nil {
 		return nil, fmt.Errorf("expected union type at %s", strings.Join(path, ""))
 	}
 

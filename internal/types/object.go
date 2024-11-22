@@ -248,6 +248,8 @@ func OpenApiToTfType(root *spec3.OpenAPI, openapi spec.Schema, path []string) (a
 			return OpenApiToTfType(root, openapi.OneOf[0], path)
 		case len(openapi.OneOf) > 1:
 			return UnionFromOpenApi(root, openapi, path)
+		case len(openapi.AnyOf) > 1:
+			return UnionFromOpenApi(root, openapi, path)
 		default:
 			return nil, fmt.Errorf("expected concrete or union type at %s", strings.Join(path, ""))
 		}
