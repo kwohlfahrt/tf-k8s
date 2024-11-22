@@ -23,6 +23,12 @@ func primitiveSchemaType(_ context.Context, attr attr.Type, required bool) (sche
 			Optional: !required,
 			Computed: false,
 		}
+	case basetypes.NumberType:
+		schemaType = schema.NumberAttribute{
+			Required: required,
+			Optional: !required,
+			Computed: false,
+		}
 	case basetypes.Int64Type:
 		schemaType = schema.Int64Attribute{
 			Required: required,
