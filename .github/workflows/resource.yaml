@@ -44,7 +44,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.23'
 
       - name: create kind cluster
         run: |
@@ -53,8 +53,11 @@ jobs:
 
       - name: install fixtures
         run: |
-          yq -o json '.crdSources[]' < internal/provider/crd/versions/${PROVIDER}.yaml \
-            | xargs -I'{}' kubectl apply --server-side -f '{}'
+          if yq --exit-status '(.crdSources | length) > 0' < internal/provider/crd/versions/${PROVIDER}.yaml; then
+            yq -o json '.crdSources[]' < internal/provider/crd/versions/${PROVIDER}.yaml \
+              | xargs -I'{}' kubectl apply --server-side -o name --filename='{}' \
+              | xargs kubectl wait --for condition=established
+          fi
           kubectl apply --server-side -f internal/provider/crd/fixtures/${PROVIDER}/data.yaml
 
       - name: configure provider
@@ -96,7 +99,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.23'
 
       - name: download generated code
         uses: actions/download-artifact@v4

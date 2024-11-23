@@ -165,7 +165,12 @@ func ListFromOpenApi(root *spec3.OpenAPI, openapi spec.Schema, path []string) (K
 	}
 
 	extensions := openapi.VendorExtensible.Extensions
-	listType := extensions["x-kubernetes-list-type"].(string)
+
+	var listType string
+	if rawListType, found := extensions["x-kubernetes-list-type"]; found {
+		listType = rawListType.(string)
+	}
+
 	var keys []string
 	if listType == "map" {
 		for _, k := range extensions["x-kubernetes-list-map-keys"].([]interface{}) {

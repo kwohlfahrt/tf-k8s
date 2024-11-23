@@ -1,0 +1,15 @@
+apiVersion: crd.projectcalico.org/v1
+kind: IPPool
+metadata:
+  name: foo
+spec:
+  cidr: 198.51.100.0/30
+  natOutgoing: true
+---
+apiVersion: crd.projectcalico.org/v1
+kind: IPPool
+metadata:
+  name: baz
+spec:
+  cidr: 198.51.100.4/30
+  natOutgoing: false
