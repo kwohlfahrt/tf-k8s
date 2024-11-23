@@ -1,0 +1,9 @@
+{
+    "Outputs": [
+        {
+            "Name": "certificate",
+            "Path": ["spec", "issuer_ref", "name"],
+            "Value": "self-signed"
+        }
+    ]
+}
