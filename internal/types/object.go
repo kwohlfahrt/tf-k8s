@@ -240,6 +240,12 @@ func OpenApiToTfType(root *spec3.OpenAPI, openapi spec.Schema, path []string) (a
 		}
 		return OpenApiToTfType(root, *schema, path)
 	}
+
+	preserveUnknown := false
+	if v, found := openapi.Extensions["x-kubernetes-preserve-unknown-fields"]; found {
+		preserveUnknown = preserveUnknown || v.(bool)
+	}
+
 	if len(openapi.Type) == 0 {
 		switch {
 		case len(openapi.AllOf) == 1:
@@ -250,6 +256,8 @@ func OpenApiToTfType(root *spec3.OpenAPI, openapi spec.Schema, path []string) (a
 			return UnionFromOpenApi(root, openapi, path)
 		case len(openapi.AnyOf) > 1:
 			return UnionFromOpenApi(root, openapi, path)
+		case preserveUnknown:
+			return KubernetesUnknownType{}, nil
 		default:
 			return nil, fmt.Errorf("expected concrete or union type at %s", strings.Join(path, ""))
 		}

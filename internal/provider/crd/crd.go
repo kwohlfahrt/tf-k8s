@@ -22,6 +22,7 @@ func init() {
 	gob.Register(types.KubernetesListType{})
 	gob.Register(types.KubernetesMapType{})
 	gob.Register(types.KubernetesUnionType{})
+	gob.Register(types.KubernetesUnknownType{})
 	gob.Register(basetypes.BoolType{})
 	gob.Register(basetypes.Int64Type{})
 	gob.Register(basetypes.Float64Type{})
