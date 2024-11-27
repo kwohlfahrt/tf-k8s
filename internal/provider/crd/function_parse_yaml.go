@@ -24,7 +24,9 @@ func NewParseYAMLFunction(typeInfo generic.TypeInfo) function.Function {
 func (f *ParseYAMLFunction) Metadata(ctx context.Context, req function.MetadataRequest, resp *function.MetadataResponse) {
 	groupComponents := []string{}
 	if f.typeInfo.Group != "" {
-		groupComponents = strings.Split(f.typeInfo.Group, ".")
+		for _, component := range strings.Split(f.typeInfo.Group, ".") {
+			groupComponents = append(groupComponents, strings.Replace(component, "-", "", -1))
+		}
 	}
 	nameComponents := []string{"parse", strings.ToLower(f.typeInfo.Kind)}
 	nameComponents = append(nameComponents, groupComponents...)

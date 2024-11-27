@@ -45,7 +45,9 @@ func NewDataSource(typeInfo generic.TypeInfo) datasource.DataSource {
 func (c *crdDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
 	groupComponents := []string{}
 	if c.typeInfo.Group != "" {
-		groupComponents = strings.Split(c.typeInfo.Group, ".")
+		for _, component := range strings.Split(c.typeInfo.Group, ".") {
+			groupComponents = append(groupComponents, strings.Replace(component, "-", "", -1))
+		}
 	}
 	nameComponents := []string{req.ProviderTypeName, strings.ToLower(c.typeInfo.Kind)}
 	nameComponents = append(nameComponents, groupComponents...)
