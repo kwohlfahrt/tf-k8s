@@ -17,10 +17,14 @@ import (
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
+type SchemaOptions struct {
+	IsDataSource bool
+}
+
 type KubernetesType interface {
 	attr.Type
 
-	SchemaType(ctx context.Context, isRequired bool) (schema.Attribute, error)
+	SchemaType(ctx context.Context, opts SchemaOptions, isRequired bool) (schema.Attribute, error)
 	ValueFromUnstructured(ctx context.Context, path path.Path, fields *fieldpath.Set, obj interface{}) (attr.Value, diag.Diagnostics)
 }
 
@@ -161,7 +165,7 @@ func (t KubernetesObjectType) ValueFromUnstructured(
 	return result, diags
 }
 
-func (t KubernetesObjectType) SchemaAttributes(ctx context.Context, isRequired bool) (map[string]schema.Attribute, error) {
+func (t KubernetesObjectType) SchemaAttributes(ctx context.Context, opts SchemaOptions, isRequired bool) (map[string]schema.Attribute, error) {
 	attributes := make(map[string]schema.Attribute, len(t.AttrTypes))
 	for k, attr := range t.AttrTypes {
 		isRequired := t.RequiredFields[k]
@@ -169,9 +173,9 @@ func (t KubernetesObjectType) SchemaAttributes(ctx context.Context, isRequired b
 		var err error
 
 		if kubernetesAttr, ok := attr.(KubernetesType); ok {
-			schemaType, err = kubernetesAttr.SchemaType(ctx, isRequired)
+			schemaType, err = kubernetesAttr.SchemaType(ctx, opts, isRequired && !opts.IsDataSource)
 		} else {
-			schemaType, err = primitiveSchemaType(ctx, attr, isRequired)
+			schemaType, err = primitiveSchemaType(ctx, attr, isRequired && !opts.IsDataSource)
 		}
 
 		if err != nil {
@@ -182,15 +186,15 @@ func (t KubernetesObjectType) SchemaAttributes(ctx context.Context, isRequired b
 	return attributes, nil
 }
 
-func (t KubernetesObjectType) SchemaType(ctx context.Context, required bool) (schema.Attribute, error) {
-	attributes, err := t.SchemaAttributes(ctx, required)
+func (t KubernetesObjectType) SchemaType(ctx context.Context, opts SchemaOptions, isRequired bool) (schema.Attribute, error) {
+	attributes, err := t.SchemaAttributes(ctx, opts, isRequired)
 	if err != nil {
 		return nil, err
 	}
 
 	return schema.SingleNestedAttribute{
-		Required:   required,
-		Optional:   !required,
+		Required:   isRequired,
+		Optional:   !isRequired,
 		Computed:   false,
 		Attributes: attributes,
 		CustomType: t,

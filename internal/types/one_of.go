@@ -22,10 +22,10 @@ type KubernetesUnionType struct {
 	Members []attr.Type
 }
 
-func (t KubernetesUnionType) SchemaType(ctx context.Context, required bool) (schema.Attribute, error) {
+func (t KubernetesUnionType) SchemaType(ctx context.Context, opts SchemaOptions, isRequired bool) (schema.Attribute, error) {
 	return schema.DynamicAttribute{
-		Required:   required,
-		Optional:   !required,
+		Required:   isRequired,
+		Optional:   !isRequired,
 		Computed:   false,
 		CustomType: t,
 	}, nil

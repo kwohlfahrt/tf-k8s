@@ -26,11 +26,11 @@ func (t KubernetesUnknownType) Equal(o attr.Type) bool {
 	return t.DynamicType.Equal(other.DynamicType)
 }
 
-func (t KubernetesUnknownType) SchemaType(ctx context.Context, required bool) (schema.Attribute, error) {
+func (t KubernetesUnknownType) SchemaType(ctx context.Context, opts SchemaOptions, isRequired bool) (schema.Attribute, error) {
 	return schema.DynamicAttribute{
 		CustomType: t,
-		Required:   required,
-		Optional:   !required,
+		Required:   isRequired,
+		Optional:   !isRequired,
 		Computed:   false,
 	}, nil
 }

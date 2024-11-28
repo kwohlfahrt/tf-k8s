@@ -56,7 +56,7 @@ func (c *crdDataSource) Metadata(ctx context.Context, req datasource.MetadataReq
 }
 
 func (c *crdDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
-	result, err := generic.OpenApiToTfSchema(ctx, c.typeInfo.Schema)
+	result, err := generic.OpenApiToTfSchema(ctx, c.typeInfo.Schema, true)
 	if err != nil {
 		resp.Diagnostics.AddError("Could not convert CRD to schema", err.Error())
 		return
