@@ -23,3 +23,22 @@ spec:
   duration: "2160h"
   renewBefore: "360h"
   secretName: example-org
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: foo
+spec:
+  acme:
+    email: user@example.com
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: qux
+    solvers:
+    - dns01:
+        webhook:
+          groupName: "foo"
+          solverName: "bar"
+          config:
+            x: "x"
+            y: { z: 3 }
