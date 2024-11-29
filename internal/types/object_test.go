@@ -46,7 +46,7 @@ func TestRequiredFields(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	spec := result.Attributes["spec"].(schema.SingleNestedAttribute)
+	spec := result.(schema.SingleNestedAttribute).Attributes["spec"].(schema.SingleNestedAttribute)
 	if !spec.Attributes["foo"].IsRequired() {
 		t.Error("Expected attribute spec.foo to be required")
 	}
@@ -60,7 +60,7 @@ func TestFieldType(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	spec := result.Attributes["spec"].(schema.SingleNestedAttribute)
+	spec := result.(schema.SingleNestedAttribute).Attributes["spec"].(schema.SingleNestedAttribute)
 	if _, ok := spec.Attributes["foo"].(schema.StringAttribute); !ok {
 		t.Error("Expected attribute spec.foo to be string attribute")
 	}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,14 +16,14 @@ import (
 )
 
 type PlanOrState interface {
-	Get(ctx context.Context, target interface{}) diag.Diagnostics
+	GetAttribute(ctx context.Context, path path.Path, target interface{}) diag.Diagnostics
 }
 
 func StateToValue(ctx context.Context, state PlanOrState, typeInfo TypeInfo) (types.KubernetesValue, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
 	var stateValue basetypes.ObjectValue
-	diags.Append(state.Get(ctx, &stateValue)...)
+	diags.Append(state.GetAttribute(ctx, path.Root("manifest"), &stateValue)...)
 	if diags.HasError() {
 		return nil, diags
 	}

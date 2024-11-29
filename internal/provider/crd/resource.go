@@ -80,14 +80,16 @@ func (c *crdResource) Schema(ctx context.Context, req tfresource.SchemaRequest, 
 		return
 	}
 
-	metadata := result.Attributes["metadata"].(schema.SingleNestedAttribute)
-	metadata.Attributes["field_manager"] = schema.StringAttribute{
-		Required: false,
-		Computed: true,
-		Default:  stringdefault.StaticString(fieldManager),
+	resp.Schema = schema.Schema{
+		Attributes: map[string]schema.Attribute{
+			"manifest": result,
+			"field_manager": schema.StringAttribute{
+				Required: false,
+				Computed: true,
+				Default:  stringdefault.StaticString(fieldManager),
+			},
+		},
 	}
-
-	resp.Schema = *result
 }
 
 func (c *crdResource) Configure(ctx context.Context, req tfresource.ConfigureRequest, resp *tfresource.ConfigureResponse) {
@@ -112,9 +114,10 @@ const fieldManager string = "tofu-k8scrd"
 
 func (c *crdResource) Create(ctx context.Context, req tfresource.CreateRequest, resp *tfresource.CreateResponse) {
 	var name, namespace string
-	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("metadata").AtName("name"), &name)...)
+	metadataPath := path.Root("manifest").AtName("metadata")
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, metadataPath.AtName("name"), &name)...)
 	if c.typeInfo.Namespaced {
-		resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("metadata").AtName("namespace"), &namespace)...)
+		resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, metadataPath.AtName("namespace"), &namespace)...)
 	}
 	if resp.Diagnostics.HasError() {
 		return
@@ -162,15 +165,16 @@ func (c *crdResource) Create(ctx context.Context, req tfresource.CreateRequest, 
 		return
 	}
 
-	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("metadata").AtName("field_manager"), fieldManager)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("manifest"), state)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("field_manager"), fieldManager)...)
 }
 
 func (c *crdResource) Read(ctx context.Context, req tfresource.ReadRequest, resp *tfresource.ReadResponse) {
 	var name, namespace string
-	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("metadata").AtName("name"), &name)...)
+	metadataPath := path.Root("manifest").AtName("metadata")
+	resp.Diagnostics.Append(req.State.GetAttribute(ctx, metadataPath.AtName("name"), &name)...)
 	if c.typeInfo.Namespaced {
-		resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("metadata").AtName("namespace"), &namespace)...)
+		resp.Diagnostics.Append(req.State.GetAttribute(ctx, metadataPath.AtName("namespace"), &namespace)...)
 	}
 	if resp.Diagnostics.HasError() {
 		return
@@ -223,19 +227,20 @@ func (c *crdResource) Read(ctx context.Context, req tfresource.ReadRequest, resp
 		return
 	}
 
-	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("manifest"), state)...)
 	if importFieldManager != nil {
-		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("metadata").AtName("field_manager"), importFieldManager)...)
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("field_manager"), importFieldManager)...)
 	} else {
-		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("metadata").AtName("field_manager"), fieldManager)...)
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("field_manager"), fieldManager)...)
 	}
 }
 
 func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, resp *tfresource.UpdateResponse) {
 	var name, namespace string
-	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("metadata").AtName("name"), &name)...)
+	metadataPath := path.Root("manifest").AtName("metadata")
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, metadataPath.AtName("name"), &name)...)
 	if c.typeInfo.Namespaced {
-		resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("metadata").AtName("namespace"), &namespace)...)
+		resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, metadataPath.AtName("namespace"), &namespace)...)
 	}
 	if resp.Diagnostics.HasError() {
 		return
@@ -299,15 +304,16 @@ func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, 
 	if diags.HasError() {
 		return
 	}
-	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("metadata").AtName("field_manager"), fieldManager)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("manifest"), state)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("field_manager"), fieldManager)...)
 }
 
 func (c *crdResource) Delete(ctx context.Context, req tfresource.DeleteRequest, resp *tfresource.DeleteResponse) {
 	var name, namespace string
-	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("metadata").AtName("name"), &name)...)
+	metadataPath := path.Root("manifest").AtName("metadata")
+	resp.Diagnostics.Append(req.State.GetAttribute(ctx, metadataPath.AtName("name"), &name)...)
 	if c.typeInfo.Namespaced {
-		resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("metadata").AtName("namespace"), &namespace)...)
+		resp.Diagnostics.Append(req.State.GetAttribute(ctx, metadataPath.AtName("namespace"), &namespace)...)
 	}
 	if resp.Diagnostics.HasError() {
 		return
@@ -350,16 +356,17 @@ func (c *crdResource) ImportState(ctx context.Context, req tfresource.ImportStat
 		return
 	}
 
+	metadataPath := path.Root("manifest").AtName("metadata")
 	if c.typeInfo.Namespaced {
 		components = strings.SplitN(resource, "/", 2)
 		if len(components) != 2 {
 			resp.Diagnostics.AddError("Invalid import ID", fmt.Sprintf("expected namespace/name resource, got %s", resource))
 			return
 		}
-		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("metadata").AtName("namespace"), components[0])...)
-		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("metadata").AtName("name"), components[1])...)
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, metadataPath.AtName("namespace"), components[0])...)
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, metadataPath.AtName("name"), components[1])...)
 	} else {
-		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("metadata").AtName("name"), resource)...)
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, metadataPath.AtName("name"), resource)...)
 	}
 
 	resp.Private.SetKey(ctx, "import-field-managers", state)

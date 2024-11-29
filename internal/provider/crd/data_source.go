@@ -62,26 +62,15 @@ func (c *crdDataSource) Schema(ctx context.Context, req datasource.SchemaRequest
 		return
 	}
 
-	attributes := make(map[string]schema.Attribute, len(result.Attributes))
-	for name, attr := range result.Attributes {
-		// resource attributes and datasource attributes are the same interface
-		// (fwschema.Attribute), so just cast it. Not sure if there's a cleaner
-		// way to implement this.
-		attributes[name] = attr.(schema.Attribute)
-	}
-
-	resp.Schema = schema.Schema{
-		Attributes:          attributes,
-		Description:         result.Description,
-		MarkdownDescription: result.MarkdownDescription,
-	}
+	resp.Schema = schema.Schema{Attributes: map[string]schema.Attribute{"manifest": result}}
 }
 
 func (c *crdDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var name, namespace string
-	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("metadata").AtName("name"), &name)...)
+	metadataPath := path.Root("manifest").AtName("metadata")
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, metadataPath.AtName("name"), &name)...)
 	if c.typeInfo.Namespaced {
-		resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("metadata").AtName("namespace"), &namespace)...)
+		resp.Diagnostics.Append(req.Config.GetAttribute(ctx, metadataPath.AtName("namespace"), &namespace)...)
 	}
 	if resp.Diagnostics.HasError() {
 		return
@@ -102,7 +91,7 @@ func (c *crdDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 	if diags.HasError() {
 		return
 	}
-	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("manifest"), state)...)
 }
 
 var (

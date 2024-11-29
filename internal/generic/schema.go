@@ -36,7 +36,7 @@ func (t TypeInfo) Interface(client *dynamic.DynamicClient, namespace string) dyn
 	return resource
 }
 
-func OpenApiToTfSchema(ctx context.Context, customType types.KubernetesObjectType, isDatasSource bool) (*schema.Schema, error) {
+func OpenApiToTfSchema(ctx context.Context, customType types.KubernetesObjectType, isDatasSource bool) (schema.Attribute, error) {
 	attributes, err := customType.SchemaAttributes(ctx, types.SchemaOptions{IsDataSource: isDatasSource}, false)
 	if err != nil {
 		return nil, err
@@ -64,5 +64,5 @@ func OpenApiToTfSchema(ctx context.Context, customType types.KubernetesObjectTyp
 	}
 	attributes["metadata"] = meta
 
-	return &schema.Schema{Attributes: attributes}, nil
+	return schema.SingleNestedAttribute{Attributes: attributes, Required: true}, nil
 }
