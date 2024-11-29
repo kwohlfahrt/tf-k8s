@@ -8,6 +8,8 @@ provider "k8scrd" {
 }
 
 resource "k8scrd_ippool_crd_projectcalico_org_v1" "bar" {
-  metadata = { name = "bar" }
-  spec     = { cidr = "198.51.100.8/30" }
+  manifest = {
+    metadata = { name = "bar" }
+    spec     = { cidr = "198.51.100.8/30" }
+  }
 }

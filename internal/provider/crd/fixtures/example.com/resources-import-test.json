@@ -2,10 +2,7 @@
     "Properties": [
         {
             "Name": "k8scrd_foo_example_com_v1.baz",
-            "Path": [
-                "spec",
-                "foo"
-            ],
+            "Path": ["manifest", "spec", "foo"],
             "Value": "baz"
         }
     ],

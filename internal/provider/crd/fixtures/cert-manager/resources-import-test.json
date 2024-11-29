@@ -2,11 +2,7 @@
     "Properties": [
         {
             "Name": "k8scrd_certificate_certmanager_io_v1.baz",
-            "Path": [
-                "spec",
-                "issuer_ref",
-                "name"
-            ],
+            "Path": ["manifest", "spec", "issuer_ref", "name" ],
             "Value": "self-signed"
         }
     ],
