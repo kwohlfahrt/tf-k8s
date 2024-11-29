@@ -12,7 +12,10 @@ output "pod" {
     apiVersion = "v1"
     kind       = "Pod"
     metadata   = { name = "bar", namespace = "default" }
-    spec       = { containers = [{ name : "ubuntu", image : "ubuntu:22.04" }] }
+    spec = { containers = [
+      { name = "ubuntu", image = "ubuntu:22.04", livenessProbe = { httpGet = { port = "healthz" } } },
+      { name = "also-ubuntu", image = "ubuntu:22.04" }
+    ] }
   })
 }
 

@@ -26,10 +26,10 @@ resource "k8scrd_deployment_apps_v1" "bar" {
       template = {
         metadata = { labels = { app = "bar" } }
         spec = {
-          containers = [{
-            name  = "foo"
-            image = "busybox"
-          }]
+          containers = [
+            { name = "foo", image = "busybox" },
+            { name = "ubuntu", image = "ubuntu:22.04", liveness_probe = { http_get = { port = "healthz" } } },
+          ]
           volumes = []
         }
       }
@@ -39,12 +39,8 @@ resource "k8scrd_deployment_apps_v1" "bar" {
 
 resource "k8scrd_configmap_v1" "bar" {
   manifest = {
-    metadata = {
-      name      = "bar"
-      namespace = "default"
-    }
-
-    data = { "foo.txt" = "bar" }
+    metadata = { name = "bar", namespace = "default" }
+    data     = { "foo.txt" = "bar" }
   }
 }
 
