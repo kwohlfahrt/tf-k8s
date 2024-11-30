@@ -33,7 +33,6 @@ func NewResource(typeInfo generic.TypeInfo) tfresource.Resource {
 			AttrTypes: maps.Clone(typeInfo.Schema.AttrTypes),
 		},
 		FieldNames:     typeInfo.Schema.FieldNames,
-		InternalFields: typeInfo.Schema.InternalFields,
 		RequiredFields: typeInfo.Schema.RequiredFields,
 	}
 
@@ -44,10 +43,7 @@ func NewResource(typeInfo generic.TypeInfo) tfresource.Resource {
 		},
 		FieldNames:     maps.Clone(metadata.FieldNames),
 		RequiredFields: maps.Clone(metadata.RequiredFields),
-		InternalFields: maps.Clone(metadata.InternalFields),
 	}
-	metadata.AttrTypes["field_manager"] = basetypes.StringType{}
-	metadata.InternalFields["field_manager"] = true
 	schema.AttrTypes["metadata"] = metadata
 
 	return &crdResource{typeInfo: generic.TypeInfo{
