@@ -57,6 +57,8 @@ func (f *ParseYAMLFunction) Run(ctx context.Context, req function.RunRequest, re
 	data := []attr.Value{}
 	types := []attr.Type{}
 
+	t := generictypes.KubernetesUnknownType{}
+
 document:
 	for i := 0; ; i += 1 {
 		itemPath := path.Empty().AtListIndex(i)
@@ -79,7 +81,7 @@ document:
 			}
 		}
 
-		obj, itemDiags := generictypes.DynamicObjectFromUnstructured(ctx, itemPath, item)
+		obj, itemDiags := t.ValueFromUnstructured(ctx, itemPath, nil, item)
 		diags.Append(itemDiags...)
 		if itemDiags.HasError() {
 			continue

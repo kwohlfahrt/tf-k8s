@@ -111,6 +111,8 @@ func (t KubernetesUnknownType) ValueFromUnstructured(ctx context.Context, path p
 		value = basetypes.NewStringValue(obj)
 	case bool:
 		value = basetypes.NewBoolValue(obj)
+	case nil:
+		value = basetypes.NewDynamicNull()
 	default:
 		diags.Append(diag.NewAttributeErrorDiagnostic(path, "Unimplemented", fmt.Sprintf("Unknown value support for type %T not implemented", obj)))
 		return nil, diags
