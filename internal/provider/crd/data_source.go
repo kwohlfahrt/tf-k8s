@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/dynamic"
 
@@ -66,17 +67,13 @@ func (c *crdDataSource) Schema(ctx context.Context, req datasource.SchemaRequest
 }
 
 func (c *crdDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var name, namespace string
-	metadataPath := path.Root("manifest").AtName("metadata")
-	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, metadataPath.AtName("name"), &name)...)
-	if c.typeInfo.Namespaced {
-		resp.Diagnostics.Append(req.Config.GetAttribute(ctx, metadataPath.AtName("namespace"), &namespace)...)
-	}
+	var meta generic.ObjectMeta
+	resp.Diagnostics.Append(generic.StateToObjectMeta(ctx, req.Config, c.typeInfo, &meta)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	obj, err := c.typeInfo.Interface(c.client, namespace).Get(ctx, name, metav1.GetOptions{})
+	obj, err := c.typeInfo.Interface(c.client, meta.Namespace).Get(ctx, meta.Name, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsGone(err) || errors.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -91,7 +88,7 @@ func (c *crdDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 	if diags.HasError() {
 		return
 	}
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("manifest"), state)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("manifest"), basetypes.NewDynamicValue(state))...)
 }
 
 var (

@@ -29,8 +29,9 @@ type KubernetesType interface {
 }
 
 type KubernetesObjectType struct {
-	basetypes.ObjectType
+	basetypes.DynamicType
 
+	AttrTypes      map[string]attr.Type
 	FieldNames     map[string]string
 	RequiredFields map[string]bool
 }
@@ -41,44 +42,64 @@ func (t KubernetesObjectType) Equal(o attr.Type) bool {
 		return false
 	}
 
-	return t.ObjectType.Equal(other.ObjectType)
+	return t.DynamicType.Equal(other.DynamicType)
 }
 
 func (t KubernetesObjectType) String() string {
 	return "KubernetesObjectType"
 }
 
-func (t KubernetesObjectType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
-	value := KubernetesObjectValue{
-		ObjectValue: in,
-		fieldNames:  t.FieldNames,
+func (t KubernetesObjectType) ValueFromDynamic(ctx context.Context, in basetypes.DynamicValue) (basetypes.DynamicValuable, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	value := KubernetesObjectValue{DynamicValue: in, attrTypes: t.AttrTypes, fieldNames: t.FieldNames}
+	if in.IsNull() || in.IsUnderlyingValueNull() || in.IsUnknown() || in.IsUnderlyingValueUnknown() {
+		return value, diags
 	}
-	return &value, nil
+
+	underlying := in.UnderlyingValue()
+	if _, ok := underlying.(basetypes.ObjectValue); !ok {
+		diags.Append(diag.NewErrorDiagnostic("Unexpected value type", fmt.Sprintf("Expected ObjectValue, got %T", underlying)))
+		return nil, diags
+	}
+	return value, diags
 }
 
 func (t KubernetesObjectType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
-	attrValue, err := t.ObjectType.ValueFromTerraform(ctx, in)
-	if err != nil {
-		return nil, err
+	var obj basetypes.ObjectValue
+	switch {
+	case in.IsNull():
+		obj = basetypes.NewObjectNull(t.AttrTypes)
+	case !in.IsKnown():
+		obj = basetypes.NewObjectUnknown(t.AttrTypes)
+	default:
+		inObj := make(map[string]tftypes.Value)
+		if err := in.As(&inObj); err != nil {
+			return nil, err
+		}
+		attrs := make(map[string]attr.Value, len(inObj))
+		attrTypes := make(map[string]attr.Type, len(inObj))
+		for k, attrType := range t.AttrTypes {
+			v, found := inObj[k]
+			if !found {
+				continue
+			}
+
+			attrValue, err := attrType.ValueFromTerraform(ctx, v)
+			if err != nil {
+				return nil, err
+			}
+			attrs[k] = attrValue
+			attrTypes[k] = attrType
+		}
+		obj = basetypes.NewObjectValueMust(attrTypes, attrs)
 	}
 
-	objectValue, ok := attrValue.(basetypes.ObjectValue)
-	if !ok {
-		return nil, fmt.Errorf("expected ObjectValue, got %T", attrValue)
-	}
-
-	objectValuable, diags := t.ValueFromObject(ctx, objectValue)
-	if diags.HasError() {
-		return nil, fmt.Errorf("error converting ObjectValue to ObjectValuable: %v", diags)
-	}
-
-	return objectValuable, nil
+	kubernetesValue, _ := t.ValueFromDynamic(ctx, basetypes.NewDynamicValue(obj))
+	return kubernetesValue, nil
 }
 
 func (t KubernetesObjectType) ValueType(ctx context.Context) attr.Value {
-	return KubernetesObjectValue{
-		fieldNames: t.FieldNames,
-	}
+	return KubernetesObjectValue{attrTypes: t.AttrTypes, fieldNames: t.FieldNames}
 }
 
 func (t KubernetesObjectType) ValueFromUnstructured(
@@ -102,6 +123,8 @@ func (t KubernetesObjectType) ValueFromUnstructured(
 	}
 
 	attributes := make(map[string]attr.Value, len(mapObj))
+	attrTypes := make(map[string]attr.Type, len(mapObj))
+
 	for k, attrType := range t.AttrTypes {
 		fieldPath := path.AtName(k)
 		fieldName, found := t.FieldNames[k]
@@ -110,7 +133,6 @@ func (t KubernetesObjectType) ValueFromUnstructured(
 				fieldPath, "Unexpected field",
 				"Field does not have a mapping to a Kubernetes property. This is a provider-internal error, please report it!",
 			))
-			attributes[k] = newNull(ctx, attrType)
 			continue
 		}
 
@@ -120,7 +142,6 @@ func (t KubernetesObjectType) ValueFromUnstructured(
 		value, found := mapObj[fieldName]
 		// Handle the parsing/datasource case, where we don't have a field-manager
 		if fields == nil && !found {
-			attributes[k] = newNull(ctx, attrType)
 			continue
 		}
 
@@ -131,28 +152,26 @@ func (t KubernetesObjectType) ValueFromUnstructured(
 			} else if childFields, found := fields.Children.Get(p); found {
 				attr, attrDiags = kubernetesAttrType.ValueFromUnstructured(ctx, fieldPath, childFields, value)
 			} else {
-				attributes[k] = newNull(ctx, attrType)
 				continue
 			}
 		} else {
 			if fields == nil || fields.Members.Has(p) {
 				attr, attrDiags = primitiveFromUnstructured(ctx, fieldPath, attrType, value)
 			} else {
-				attributes[k] = newNull(ctx, attrType)
 				continue
 			}
 		}
 		diags.Append(attrDiags...)
 		if attrDiags.HasError() {
-			attributes[k] = newNull(ctx, attrType)
 			continue
 		}
 		attributes[k] = attr
+		attrTypes[k] = attr.Type(ctx)
 	}
 
-	baseObj, objDiags := basetypes.NewObjectValue(t.AttrTypes, attributes)
+	baseObj, objDiags := basetypes.NewObjectValue(attrTypes, attributes)
 	diags.Append(objDiags...)
-	result, objDiags := t.ValueFromObject(ctx, baseObj)
+	result, objDiags := t.ValueFromDynamic(ctx, basetypes.NewDynamicValue(baseObj))
 	diags.Append(objDiags...)
 
 	return result, diags
@@ -180,17 +199,12 @@ func (t KubernetesObjectType) SchemaAttributes(ctx context.Context, opts SchemaO
 }
 
 func (t KubernetesObjectType) SchemaType(ctx context.Context, opts SchemaOptions, isRequired bool) (schema.Attribute, error) {
-	attributes, err := t.SchemaAttributes(ctx, opts, isRequired)
-	if err != nil {
-		return nil, err
-	}
-
-	return schema.SingleNestedAttribute{
+	return schema.DynamicAttribute{
 		Required:   isRequired,
 		Optional:   !isRequired,
 		Computed:   false,
-		Attributes: attributes,
 		CustomType: t,
+		Validators: nil, // TODO
 	}, nil
 }
 
@@ -217,7 +231,8 @@ func ObjectFromOpenApi(root *spec3.OpenAPI, openapi spec.Schema, path []string) 
 	}
 
 	return KubernetesObjectType{
-		ObjectType:     basetypes.ObjectType{AttrTypes: attrTypes},
+		DynamicType:    basetypes.DynamicType{},
+		AttrTypes:      attrTypes,
 		FieldNames:     fieldNames,
 		RequiredFields: requiredFields,
 	}, nil
@@ -287,7 +302,7 @@ func OpenApiToTfType(root *spec3.OpenAPI, openapi spec.Schema, path []string) (a
 	}
 }
 
-var _ basetypes.ObjectTypable = KubernetesObjectType{}
+var _ basetypes.DynamicTypable = KubernetesObjectType{}
 var _ KubernetesType = KubernetesObjectType{}
 
 type KubernetesValue interface {
@@ -298,8 +313,9 @@ type KubernetesValue interface {
 }
 
 type KubernetesObjectValue struct {
-	basetypes.ObjectValue
+	basetypes.DynamicValue
 
+	attrTypes  map[string]attr.Type
 	fieldNames map[string]string
 }
 
@@ -308,16 +324,19 @@ func (v KubernetesObjectValue) Equal(o attr.Value) bool {
 	if !ok {
 		return false
 	}
-	return v.ObjectValue.Equal(other.ObjectValue)
+	return v.DynamicValue.Equal(other.DynamicValue)
 }
 
 func (v KubernetesObjectValue) Type(ctx context.Context) attr.Type {
 	return KubernetesObjectType{
-		ObjectType: basetypes.ObjectType{
-			AttrTypes: v.AttributeTypes(ctx),
-		},
-		FieldNames: v.fieldNames,
+		DynamicType: basetypes.DynamicType{},
+		AttrTypes:   v.attrTypes,
+		FieldNames:  v.fieldNames,
 	}
+}
+
+func (v KubernetesObjectValue) Attributes() map[string]attr.Value {
+	return v.UnderlyingValue().(basetypes.ObjectValue).Attributes()
 }
 
 func (v KubernetesObjectValue) ToUnstructured(ctx context.Context, path path.Path) (interface{}, diag.Diagnostics) {
@@ -387,5 +406,5 @@ func (v KubernetesObjectValue) ManagedFields(ctx context.Context, path path.Path
 	return diags
 }
 
-var _ basetypes.ObjectValuable = KubernetesObjectValue{}
+var _ basetypes.DynamicValuable = KubernetesObjectValue{}
 var _ KubernetesValue = KubernetesObjectValue{}

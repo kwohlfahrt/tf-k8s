@@ -2,7 +2,6 @@ package generic
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types"
@@ -37,32 +36,6 @@ func (t TypeInfo) Interface(client *dynamic.DynamicClient, namespace string) dyn
 }
 
 func OpenApiToTfSchema(ctx context.Context, customType types.KubernetesObjectType, isDatasSource bool) (schema.Attribute, error) {
-	attributes, err := customType.SchemaAttributes(ctx, types.SchemaOptions{IsDataSource: isDatasSource}, false)
-	if err != nil {
-		return nil, err
-	}
-
-	meta, ok := attributes["metadata"].(schema.SingleNestedAttribute)
-	if !ok {
-		return nil, fmt.Errorf("expected object attribute at metadata")
-	}
-	meta.Computed = false
-	meta.Optional = false
-	meta.Required = true
-	for _, attrName := range []string{"name", "namespace"} {
-		attr, ok := meta.Attributes[attrName].(schema.StringAttribute)
-		if !ok {
-			if attrName == "namespace" {
-				continue
-			}
-			return nil, fmt.Errorf("expected string attribute at metadata.%s", attrName)
-		}
-		attr.Computed = false
-		attr.Optional = false
-		attr.Required = true
-		meta.Attributes[attrName] = attr
-	}
-	attributes["metadata"] = meta
-
-	return schema.SingleNestedAttribute{Attributes: attributes, Required: true}, nil
+	// TODO: Add validator for metadata fields
+	return customType.SchemaType(ctx, types.SchemaOptions{IsDataSource: isDatasSource}, false)
 }

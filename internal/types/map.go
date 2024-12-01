@@ -17,7 +17,9 @@ import (
 )
 
 type KubernetesMapType struct {
-	basetypes.MapType
+	basetypes.DynamicType
+
+	ElemType attr.Type
 }
 
 func (t KubernetesMapType) Equal(o attr.Type) bool {
@@ -26,39 +28,61 @@ func (t KubernetesMapType) Equal(o attr.Type) bool {
 		return false
 	}
 
-	return t.MapType.Equal(other.MapType)
+	return t.DynamicType.Equal(other.DynamicType)
 }
 
 func (t KubernetesMapType) String() string {
 	return "KubernetesMapType"
 }
 
-func (t KubernetesMapType) ValueFromMap(ctx context.Context, in basetypes.MapValue) (basetypes.MapValuable, diag.Diagnostics) {
-	value := KubernetesMapValue{MapValue: in}
-	return &value, nil
+func (t KubernetesMapType) ValueFromDynamic(ctx context.Context, in basetypes.DynamicValue) (basetypes.DynamicValuable, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	value := KubernetesMapValue{DynamicValue: in, elemType: t.ElemType}
+	if in.IsNull() || in.IsUnderlyingValueNull() || in.IsUnknown() || in.IsUnderlyingValueUnknown() {
+		return value, diags
+	}
+
+	underlying := in.UnderlyingValue()
+	switch underlying.(type) {
+	case basetypes.MapValue, basetypes.ObjectValue:
+		return value, diags
+	default:
+		diags.Append(diag.NewErrorDiagnostic("Unexpected value type", fmt.Sprintf("Expected MapValue, got %T", underlying)))
+		return nil, diags
+	}
 }
 
 func (t KubernetesMapType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
-	attrValue, err := t.MapType.ValueFromTerraform(ctx, in)
-	if err != nil {
-		return nil, err
+	var obj basetypes.ObjectValue
+	switch {
+	case in.IsNull():
+		obj = basetypes.NewObjectNull(map[string]attr.Type{})
+	case !in.IsKnown():
+		obj = basetypes.NewObjectUnknown(map[string]attr.Type{})
+	default:
+		inObj := make(map[string]tftypes.Value, 0)
+		if err := in.As(&inObj); err != nil {
+			return nil, err
+		}
+		elems := make(map[string]attr.Value, len(inObj))
+		elemTypes := make(map[string]attr.Type, len(inObj))
+		for k, v := range inObj {
+			elem, err := t.ElemType.ValueFromTerraform(ctx, v)
+			if err != nil {
+				return nil, err
+			}
+			elems[k] = elem
+			elemTypes[k] = t.ElemType
+		}
+		obj = basetypes.NewObjectValueMust(elemTypes, elems)
 	}
 
-	mapValue, ok := attrValue.(basetypes.MapValue)
-	if !ok {
-		return nil, fmt.Errorf("expected MapValue, got %T", attrValue)
-	}
-
-	mapValuable, diags := t.ValueFromMap(ctx, mapValue)
-	if diags.HasError() {
-		return nil, fmt.Errorf("error converting MapValue to MapValuable: %v", diags)
-	}
-
-	return mapValuable, nil
+	kubernetesValue, _ := t.ValueFromDynamic(ctx, basetypes.NewDynamicValue(obj))
+	return kubernetesValue, nil
 }
 
 func (t KubernetesMapType) ValueType(ctx context.Context) attr.Value {
-	return KubernetesMapValue{}
+	return KubernetesMapValue{elemType: t.ElemType}
 }
 
 func (t KubernetesMapType) ValueFromUnstructured(
@@ -82,6 +106,7 @@ func (t KubernetesMapType) ValueFromUnstructured(
 	}
 
 	elems := make(map[string]attr.Value, len(mapObj))
+	elemTypes := make(map[string]attr.Type, len(mapObj))
 	for k, value := range mapObj {
 		elemPath := path.AtMapKey(k)
 
@@ -108,42 +133,25 @@ func (t KubernetesMapType) ValueFromUnstructured(
 			continue
 		}
 		elems[k] = elem
+		elemTypes[k] = t.ElemType
 	}
 
-	baseMap, mapDiags := basetypes.NewMapValue(t.ElemType, elems)
+	baseMap, mapDiags := basetypes.NewObjectValue(elemTypes, elems)
 	diags.Append(mapDiags...)
-	result, mapDiags := t.ValueFromMap(ctx, baseMap)
+	result, mapDiags := t.ValueFromDynamic(ctx, basetypes.NewDynamicValue(baseMap))
 	diags.Append(mapDiags...)
 
 	return result, diags
 }
 
 func (t KubernetesMapType) SchemaType(ctx context.Context, opts SchemaOptions, isRequired bool) (schema.Attribute, error) {
-	elem := t.ElementType()
-	if objectElem, ok := elem.(KubernetesObjectType); ok {
-		attributes, err := objectElem.SchemaAttributes(ctx, opts, isRequired)
-		if err != nil {
-			return nil, err
-		}
-		return schema.MapNestedAttribute{
-			Required:   isRequired,
-			Optional:   !isRequired,
-			Computed:   false,
-			CustomType: t,
-			NestedObject: schema.NestedAttributeObject{
-				Attributes: attributes,
-				CustomType: objectElem,
-			},
-		}, nil
-	} else {
-		return schema.MapAttribute{
-			Required:    isRequired,
-			Optional:    !isRequired,
-			Computed:    false,
-			CustomType:  t,
-			ElementType: elem,
-		}, nil
-	}
+	return schema.DynamicAttribute{
+		Required:   isRequired,
+		Optional:   !isRequired,
+		Computed:   false,
+		CustomType: t,
+		Validators: nil, // TODO
+	}, nil
 }
 
 func MapFromOpenApi(root *spec3.OpenAPI, openapi spec.Schema, path []string) (KubernetesType, error) {
@@ -157,19 +165,26 @@ func MapFromOpenApi(root *spec3.OpenAPI, openapi spec.Schema, path []string) (Ku
 		return nil, err
 	}
 
-	return KubernetesMapType{MapType: basetypes.MapType{ElemType: elemType}}, nil
+	return KubernetesMapType{DynamicType: basetypes.DynamicType{}, ElemType: elemType}, nil
 }
 
-var _ basetypes.MapTypable = KubernetesMapType{}
+var _ basetypes.DynamicTypable = KubernetesMapType{}
 var _ KubernetesType = KubernetesMapType{}
 
 type KubernetesMapValue struct {
-	basetypes.MapValue
+	basetypes.DynamicValue
+
+	elemType attr.Type
+}
+
+func (v KubernetesMapValue) Attributes() map[string]attr.Value {
+	return v.UnderlyingValue().(basetypes.ObjectValue).Attributes()
 }
 
 func (v KubernetesMapValue) ToUnstructured(ctx context.Context, path path.Path) (interface{}, diag.Diagnostics) {
 	var diags diag.Diagnostics
-	elems := v.MapValue.Elements()
+
+	elems := v.Attributes()
 	result := make(map[string]interface{}, len(elems))
 	for k, elem := range elems {
 		elemPath := path.AtMapKey(k)
@@ -194,18 +209,19 @@ func (v KubernetesMapValue) Equal(o attr.Value) bool {
 	if !ok {
 		return false
 	}
-	return v.MapValue.Equal(other.MapValue)
+	return v.DynamicValue.Equal(other.DynamicValue)
 }
 
 func (v KubernetesMapValue) Type(ctx context.Context) attr.Type {
-	return KubernetesMapType{MapType: basetypes.MapType{ElemType: v.ElementType(ctx)}}
+	return KubernetesMapType{DynamicType: basetypes.DynamicType{}, ElemType: v.elemType}
 }
 
 func (v KubernetesMapValue) ManagedFields(ctx context.Context, path path.Path, fields *fieldpath.Set, pe *fieldpath.PathElement) diag.Diagnostics {
 	var diags diag.Diagnostics
 
 	fields = fields.Children.Descend(*pe)
-	for k, elem := range v.Elements() {
+	elems := v.Attributes()
+	for k, elem := range elems {
 		if elem.IsNull() {
 			continue
 		}
@@ -222,5 +238,5 @@ func (v KubernetesMapValue) ManagedFields(ctx context.Context, path path.Path, f
 	return diags
 }
 
-var _ basetypes.MapValuable = KubernetesMapValue{}
+var _ basetypes.DynamicValuable = KubernetesMapValue{}
 var _ KubernetesValue = KubernetesMapValue{}

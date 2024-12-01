@@ -18,9 +18,10 @@ import (
 )
 
 type KubernetesListType struct {
-	basetypes.ListType
+	basetypes.DynamicType
 
-	Keys []string
+	ElemType attr.Type
+	Keys     []string
 }
 
 func (t KubernetesListType) Equal(o attr.Type) bool {
@@ -29,39 +30,61 @@ func (t KubernetesListType) Equal(o attr.Type) bool {
 		return false
 	}
 
-	return t.ListType.Equal(other.ListType)
+	return t.DynamicType.Equal(other.DynamicType)
 }
 
 func (t KubernetesListType) String() string {
 	return "KubernetesListType"
 }
 
-func (t KubernetesListType) ValueFromList(ctx context.Context, in basetypes.ListValue) (basetypes.ListValuable, diag.Diagnostics) {
-	value := KubernetesListValue{ListValue: in, keys: t.Keys}
-	return &value, nil
+func (t KubernetesListType) ValueFromDynamic(ctx context.Context, in basetypes.DynamicValue) (basetypes.DynamicValuable, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	value := KubernetesListValue{DynamicValue: in, elemType: t.ElemType, keys: t.Keys}
+	if in.IsNull() || in.IsUnderlyingValueNull() || in.IsUnknown() || in.IsUnderlyingValueUnknown() {
+		return value, diags
+	}
+
+	underlying := in.UnderlyingValue()
+	switch underlying.(type) {
+	case basetypes.ListValue, basetypes.TupleValue:
+		return value, diags
+	default:
+		diags.Append(diag.NewErrorDiagnostic("Unexpected value type", fmt.Sprintf("Expected ListValue, got %T", underlying)))
+		return nil, diags
+	}
 }
 
 func (t KubernetesListType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
-	attrValue, err := t.ListType.ValueFromTerraform(ctx, in)
-	if err != nil {
-		return nil, err
+	var obj basetypes.TupleValue
+	switch {
+	case in.IsNull():
+		obj = basetypes.NewTupleNull([]attr.Type{})
+	case !in.IsKnown():
+		obj = basetypes.NewTupleUnknown([]attr.Type{})
+	default:
+		inObj := make([]tftypes.Value, 0)
+		if err := in.As(&inObj); err != nil {
+			return nil, err
+		}
+		elemTypes := make([]attr.Type, 0, len(inObj))
+		elems := make([]attr.Value, 0, len(inObj))
+		for _, v := range inObj {
+			elem, err := t.ElemType.ValueFromTerraform(ctx, v)
+			if err != nil {
+				return nil, err
+			}
+			elemTypes = append(elemTypes, t.ElemType)
+			elems = append(elems, elem)
+		}
+		obj = basetypes.NewTupleValueMust(elemTypes, elems)
 	}
 
-	listValue, ok := attrValue.(basetypes.ListValue)
-	if !ok {
-		return nil, fmt.Errorf("expected ListValue, got %T", attrValue)
-	}
-
-	listValuable, diags := t.ValueFromList(ctx, listValue)
-	if diags.HasError() {
-		return nil, fmt.Errorf("error converting ListValue to ListValuable: %v", diags)
-	}
-
-	return listValuable, nil
+	kubernetesValue, _ := t.ValueFromDynamic(ctx, basetypes.NewDynamicValue(obj))
+	return kubernetesValue, nil
 }
 
 func (t KubernetesListType) ValueType(ctx context.Context) attr.Value {
-	return KubernetesListValue{}
+	return KubernetesListValue{elemType: t.ElemType, keys: t.Keys}
 }
 
 func (t KubernetesListType) ValueFromUnstructured(ctx context.Context, path path.Path, fields *fieldpath.Set, obj interface{}) (attr.Value, diag.Diagnostics) {
@@ -80,6 +103,7 @@ func (t KubernetesListType) ValueFromUnstructured(ctx context.Context, path path
 	}
 
 	elems := make([]attr.Value, 0, len(sliceObj))
+	elemTypes := make([]attr.Type, 0, len(sliceObj))
 	for i, value := range sliceObj {
 		elemPath := path.AtListIndex(i)
 
@@ -120,42 +144,25 @@ func (t KubernetesListType) ValueFromUnstructured(ctx context.Context, path path
 			continue
 		}
 		elems = append(elems, elem)
+		elemTypes = append(elemTypes, t.ElemType)
 	}
 
-	baseList, listDiags := basetypes.NewListValue(t.ElemType, elems)
+	baseList, listDiags := basetypes.NewTupleValue(elemTypes, elems)
 	diags.Append(listDiags...)
-	result, listDiags := t.ValueFromList(ctx, baseList)
+	result, listDiags := t.ValueFromDynamic(ctx, basetypes.NewDynamicValue(baseList))
 	diags.Append(listDiags...)
 
 	return result, diags
 }
 
 func (t KubernetesListType) SchemaType(ctx context.Context, opts SchemaOptions, isRequired bool) (schema.Attribute, error) {
-	elem := t.ElementType()
-	if objectElem, ok := elem.(KubernetesObjectType); ok {
-		attributes, err := objectElem.SchemaAttributes(ctx, opts, isRequired)
-		if err != nil {
-			return nil, err
-		}
-		return schema.ListNestedAttribute{
-			Required:   isRequired,
-			Optional:   !isRequired,
-			Computed:   false,
-			CustomType: t,
-			NestedObject: schema.NestedAttributeObject{
-				Attributes: attributes,
-				CustomType: objectElem,
-			},
-		}, nil
-	} else {
-		return schema.ListAttribute{
-			Required:    isRequired,
-			Optional:    !isRequired,
-			Computed:    false,
-			CustomType:  t,
-			ElementType: elem,
-		}, nil
-	}
+	return schema.DynamicAttribute{
+		Required:   isRequired,
+		Optional:   !isRequired,
+		Computed:   false,
+		CustomType: t,
+		Validators: nil, // TODO
+	}, nil
 }
 
 func ListFromOpenApi(root *spec3.OpenAPI, openapi spec.Schema, path []string) (KubernetesType, error) {
@@ -183,21 +190,26 @@ func ListFromOpenApi(root *spec3.OpenAPI, openapi spec.Schema, path []string) (K
 		return nil, err
 	}
 
-	return KubernetesListType{ListType: basetypes.ListType{ElemType: elemType}, Keys: keys}, nil
+	return KubernetesListType{DynamicType: basetypes.DynamicType{}, ElemType: elemType, Keys: keys}, nil
 }
 
-var _ basetypes.ListTypable = KubernetesListType{}
+var _ basetypes.DynamicTypable = KubernetesListType{}
 var _ KubernetesType = KubernetesListType{}
 
 type KubernetesListValue struct {
-	basetypes.ListValue
+	basetypes.DynamicValue
 
-	keys []string
+	elemType attr.Type
+	keys     []string
+}
+
+func (v KubernetesListValue) Elements() []attr.Value {
+	return v.UnderlyingValue().(basetypes.TupleValue).Elements()
 }
 
 func (v KubernetesListValue) ToUnstructured(ctx context.Context, path path.Path) (interface{}, diag.Diagnostics) {
 	var diags diag.Diagnostics
-	elems := v.ListValue.Elements()
+	elems := v.Elements()
 	result := make([]interface{}, 0, len(elems))
 	for i, elem := range elems {
 		elemPath := path.AtListIndex(i)
@@ -222,11 +234,11 @@ func (v KubernetesListValue) Equal(o attr.Value) bool {
 	if !ok {
 		return false
 	}
-	return v.ListValue.Equal(other.ListValue)
+	return v.DynamicValue.Equal(other.DynamicValue)
 }
 
 func (v KubernetesListValue) Type(ctx context.Context) attr.Type {
-	return KubernetesListType{ListType: basetypes.ListType{ElemType: v.ElementType(ctx)}, Keys: v.keys}
+	return KubernetesListType{DynamicType: basetypes.DynamicType{}, ElemType: v.elemType, Keys: v.keys}
 }
 
 func (v KubernetesListValue) ManagedFields(ctx context.Context, path path.Path, fields *fieldpath.Set, pe *fieldpath.PathElement) diag.Diagnostics {
@@ -244,7 +256,7 @@ func (v KubernetesListValue) ManagedFields(ctx context.Context, path path.Path, 
 		if v.keys != nil {
 			key := make(diffvalue.FieldList, 0, len(v.keys))
 
-			obj := elem.(*KubernetesObjectValue)
+			obj := elem.(KubernetesObjectValue)
 			unstructured, objDiags := obj.ToUnstructured(ctx, path)
 			diags.Append(objDiags...)
 			if objDiags.HasError() {
@@ -271,5 +283,5 @@ func (v KubernetesListValue) ManagedFields(ctx context.Context, path path.Path, 
 	return diags
 }
 
-var _ basetypes.ListValuable = KubernetesListValue{}
+var _ basetypes.DynamicValuable = KubernetesListValue{}
 var _ KubernetesValue = KubernetesListValue{}
