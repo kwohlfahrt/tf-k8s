@@ -4,16 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"maps"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	tfresource "github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
-	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/generic"
-	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -28,32 +25,7 @@ type crdResource struct {
 }
 
 func NewResource(typeInfo generic.TypeInfo) tfresource.Resource {
-	schema := types.KubernetesObjectType{
-		ObjectType: basetypes.ObjectType{
-			AttrTypes: maps.Clone(typeInfo.Schema.AttrTypes),
-		},
-		FieldNames:     typeInfo.Schema.FieldNames,
-		RequiredFields: typeInfo.Schema.RequiredFields,
-	}
-
-	metadata := schema.AttrTypes["metadata"].(types.KubernetesObjectType)
-	metadata = types.KubernetesObjectType{
-		ObjectType: basetypes.ObjectType{
-			AttrTypes: maps.Clone(metadata.AttrTypes),
-		},
-		FieldNames:     maps.Clone(metadata.FieldNames),
-		RequiredFields: maps.Clone(metadata.RequiredFields),
-	}
-	schema.AttrTypes["metadata"] = metadata
-
-	return &crdResource{typeInfo: generic.TypeInfo{
-		Group:      typeInfo.Group,
-		Resource:   typeInfo.Resource,
-		Kind:       typeInfo.Kind,
-		Version:    typeInfo.Version,
-		Namespaced: typeInfo.Namespaced,
-		Schema:     schema,
-	}}
+	return &crdResource{typeInfo: typeInfo}
 }
 
 func (c *crdResource) Metadata(ctx context.Context, req tfresource.MetadataRequest, resp *tfresource.MetadataResponse) {
