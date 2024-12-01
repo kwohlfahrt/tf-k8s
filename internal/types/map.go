@@ -150,7 +150,6 @@ func (t KubernetesMapType) SchemaType(ctx context.Context, opts SchemaOptions, i
 		Optional:   !isRequired,
 		Computed:   false,
 		CustomType: t,
-		Validators: nil, // TODO
 	}, nil
 }
 
@@ -232,6 +231,21 @@ func (v KubernetesMapValue) ManagedFields(ctx context.Context, path path.Path, f
 			diags.Append(kubernetesAttr.ManagedFields(ctx, fieldPath, fields, &pathElem)...)
 		} else {
 			fields.Insert([]fieldpath.PathElement{pathElem})
+		}
+	}
+
+	return diags
+}
+
+func (v KubernetesMapValue) Validate(ctx context.Context, path path.Path) diag.Diagnostics {
+	var diags diag.Diagnostics
+	if v.IsNull() || v.IsUnknown() || v.IsUnderlyingValueNull() || v.IsUnderlyingValueUnknown() {
+		return diags
+	}
+
+	for k, elem := range v.Attributes() {
+		if kubernetesElem, ok := elem.(KubernetesValue); ok {
+			diags.Append(kubernetesElem.Validate(ctx, path.AtMapKey(k))...)
 		}
 	}
 

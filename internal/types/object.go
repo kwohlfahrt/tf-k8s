@@ -6,7 +6,9 @@ import (
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/attr/xattr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/function"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
@@ -51,7 +53,12 @@ func (t KubernetesObjectType) String() string {
 
 func (t KubernetesObjectType) ValueFromDynamic(ctx context.Context, in basetypes.DynamicValue) (basetypes.DynamicValuable, diag.Diagnostics) {
 	var diags diag.Diagnostics
-	value := KubernetesObjectValue{DynamicValue: in, attrTypes: t.AttrTypes, fieldNames: t.FieldNames}
+	value := KubernetesObjectValue{
+		DynamicValue:   in,
+		attrTypes:      t.AttrTypes,
+		fieldNames:     t.FieldNames,
+		requiredFields: t.RequiredFields,
+	}
 	if in.IsNull() || in.IsUnderlyingValueNull() || in.IsUnknown() || in.IsUnderlyingValueUnknown() {
 		return value, diags
 	}
@@ -78,16 +85,19 @@ func (t KubernetesObjectType) ValueFromTerraform(ctx context.Context, in tftypes
 		}
 		attrs := make(map[string]attr.Value, len(inObj))
 		attrTypes := make(map[string]attr.Type, len(inObj))
-		for k, attrType := range t.AttrTypes {
-			v, found := inObj[k]
-			if !found {
-				continue
+		for k, v := range inObj {
+			var attrType attr.Type
+			var found bool
+
+			if attrType, found = t.AttrTypes[k]; !found {
+				attrType = basetypes.DynamicType{}
 			}
 
 			attrValue, err := attrType.ValueFromTerraform(ctx, v)
 			if err != nil {
 				return nil, err
 			}
+
 			attrs[k] = attrValue
 			attrTypes[k] = attrType
 		}
@@ -99,7 +109,11 @@ func (t KubernetesObjectType) ValueFromTerraform(ctx context.Context, in tftypes
 }
 
 func (t KubernetesObjectType) ValueType(ctx context.Context) attr.Value {
-	return KubernetesObjectValue{attrTypes: t.AttrTypes, fieldNames: t.FieldNames}
+	return KubernetesObjectValue{
+		attrTypes:      t.AttrTypes,
+		fieldNames:     t.FieldNames,
+		requiredFields: t.RequiredFields,
+	}
 }
 
 func (t KubernetesObjectType) ValueFromUnstructured(
@@ -129,10 +143,6 @@ func (t KubernetesObjectType) ValueFromUnstructured(
 		fieldPath := path.AtName(k)
 		fieldName, found := t.FieldNames[k]
 		if !found {
-			diags.Append(diag.NewAttributeErrorDiagnostic(
-				fieldPath, "Unexpected field",
-				"Field does not have a mapping to a Kubernetes property. This is a provider-internal error, please report it!",
-			))
 			continue
 		}
 
@@ -204,7 +214,6 @@ func (t KubernetesObjectType) SchemaType(ctx context.Context, opts SchemaOptions
 		Optional:   !isRequired,
 		Computed:   false,
 		CustomType: t,
-		Validators: nil, // TODO
 	}, nil
 }
 
@@ -310,13 +319,15 @@ type KubernetesValue interface {
 
 	ToUnstructured(ctx context.Context, path path.Path) (interface{}, diag.Diagnostics)
 	ManagedFields(ctx context.Context, path path.Path, fields *fieldpath.Set, pe *fieldpath.PathElement) diag.Diagnostics
+	Validate(ctx context.Context, path path.Path) diag.Diagnostics
 }
 
 type KubernetesObjectValue struct {
 	basetypes.DynamicValue
 
-	attrTypes  map[string]attr.Type
-	fieldNames map[string]string
+	attrTypes      map[string]attr.Type
+	fieldNames     map[string]string
+	requiredFields map[string]bool
 }
 
 func (v KubernetesObjectValue) Equal(o attr.Value) bool {
@@ -329,9 +340,10 @@ func (v KubernetesObjectValue) Equal(o attr.Value) bool {
 
 func (v KubernetesObjectValue) Type(ctx context.Context) attr.Type {
 	return KubernetesObjectType{
-		DynamicType: basetypes.DynamicType{},
-		AttrTypes:   v.attrTypes,
-		FieldNames:  v.fieldNames,
+		DynamicType:    basetypes.DynamicType{},
+		AttrTypes:      v.attrTypes,
+		FieldNames:     v.fieldNames,
+		RequiredFields: v.requiredFields,
 	}
 }
 
@@ -351,10 +363,6 @@ func (v KubernetesObjectValue) ToUnstructured(ctx context.Context, path path.Pat
 		fieldPath := path.AtName(k)
 		fieldName, found := v.fieldNames[k]
 		if !found {
-			diags.Append(diag.NewAttributeErrorDiagnostic(
-				fieldPath, "Unexpected field",
-				"Field does not have a mapping to a Kubernetes property. This is a provider-internal error, please report it!",
-			))
 			continue
 		}
 		var attrObj interface{}
@@ -390,10 +398,6 @@ func (v KubernetesObjectValue) ManagedFields(ctx context.Context, path path.Path
 		fieldPath := path.AtName(k)
 		fieldName, found := v.fieldNames[k]
 		if !found {
-			diags.Append(diag.NewAttributeErrorDiagnostic(
-				fieldPath, "Unexpected field",
-				"Field does not have a mapping to a Kubernetes property. This is a provider-internal error, please report it!",
-			))
 			continue
 		}
 		pathElem := fieldpath.PathElement{FieldName: &fieldName}
@@ -406,5 +410,57 @@ func (v KubernetesObjectValue) ManagedFields(ctx context.Context, path path.Path
 	return diags
 }
 
+func (v KubernetesObjectValue) Validate(ctx context.Context, path path.Path) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	if v.IsNull() || v.IsUnknown() || v.IsUnderlyingValueNull() || v.IsUnderlyingValueUnknown() {
+		return diags
+	}
+
+	attrs := v.Attributes()
+	missingAttributes := make([]string, 0)
+	for k, _ := range v.requiredFields {
+		if _, found := attrs[k]; !found {
+			missingAttributes = append(missingAttributes, k)
+		}
+	}
+	if len(missingAttributes) > 0 {
+		diags.Append(diag.NewAttributeErrorDiagnostic(
+			path, "Missing required values",
+			fmt.Sprintf("missing keys: %s", strings.Join(missingAttributes, ", ")),
+		))
+	}
+
+	extraAttributes := make([]string, 0)
+	for k, elem := range attrs {
+		if kubernetesElem, ok := elem.(KubernetesValue); ok {
+			diags.Append(kubernetesElem.Validate(ctx, path.AtName(k))...)
+		}
+		if _, found := v.attrTypes[k]; !found {
+			extraAttributes = append(extraAttributes, k)
+		}
+	}
+
+	if len(extraAttributes) > 0 {
+		diags.Append(diag.NewAttributeWarningDiagnostic(
+			path, "Unrecognized values",
+			fmt.Sprintf("extra keys: %s", strings.Join(extraAttributes, ", ")),
+		))
+	}
+
+	return diags
+}
+
+func (v KubernetesObjectValue) ValidateAttribute(ctx context.Context, req xattr.ValidateAttributeRequest, resp *xattr.ValidateAttributeResponse) {
+	resp.Diagnostics = v.Validate(ctx, req.Path)
+}
+
+func (v KubernetesObjectValue) ValidateParameter(ctx context.Context, req function.ValidateParameterRequest, resp *function.ValidateParameterResponse) {
+	diags := v.Validate(ctx, path.Empty().AtListIndex(int(req.Position)))
+	resp.Error = function.FuncErrorFromDiags(ctx, diags)
+}
+
 var _ basetypes.DynamicValuable = KubernetesObjectValue{}
 var _ KubernetesValue = KubernetesObjectValue{}
+var _ xattr.ValidateableAttribute = KubernetesObjectValue{}
+var _ function.ValidateableParameter = KubernetesObjectValue{}

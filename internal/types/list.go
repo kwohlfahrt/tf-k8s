@@ -161,7 +161,6 @@ func (t KubernetesListType) SchemaType(ctx context.Context, opts SchemaOptions, 
 		Optional:   !isRequired,
 		Computed:   false,
 		CustomType: t,
-		Validators: nil, // TODO
 	}, nil
 }
 
@@ -277,6 +276,21 @@ func (v KubernetesListValue) ManagedFields(ctx context.Context, path path.Path, 
 			diags.Append(kubernetesAttr.ManagedFields(ctx, fieldPath, fields, &pathElem)...)
 		} else {
 			fields.Insert([]fieldpath.PathElement{pathElem})
+		}
+	}
+
+	return diags
+}
+
+func (v KubernetesListValue) Validate(ctx context.Context, path path.Path) diag.Diagnostics {
+	var diags diag.Diagnostics
+	if v.IsNull() || v.IsUnknown() || v.IsUnderlyingValueNull() || v.IsUnderlyingValueUnknown() {
+		return diags
+	}
+
+	for i, elem := range v.Elements() {
+		if kubernetesElem, ok := elem.(KubernetesValue); ok {
+			diags.Append(kubernetesElem.Validate(ctx, path.AtListIndex(i))...)
 		}
 	}
 

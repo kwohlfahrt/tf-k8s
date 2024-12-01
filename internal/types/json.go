@@ -242,5 +242,10 @@ func (v KubernetesUnknownValue) ManagedFields(ctx context.Context, path path.Pat
 	}
 }
 
+func (v KubernetesUnknownValue) Validate(ctx context.Context, path path.Path) diag.Diagnostics {
+	// TODO
+	return nil
+}
+
 var _ basetypes.DynamicValuable = KubernetesUnknownValue{}
 var _ KubernetesValue = KubernetesUnknownValue{}

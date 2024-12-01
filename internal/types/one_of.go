@@ -141,6 +141,11 @@ func (v KubernetesUnionValue) ManagedFields(ctx context.Context, path path.Path,
 	}
 }
 
+func (v KubernetesUnionValue) Validate(ctx context.Context, path path.Path) diag.Diagnostics {
+	// TODO
+	return nil
+}
+
 var _ basetypes.DynamicValuable = KubernetesUnionValue{}
 var _ KubernetesValue = KubernetesUnionValue{}
 
