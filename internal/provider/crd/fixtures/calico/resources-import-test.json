@@ -2,10 +2,7 @@
     "Properties": [
         {
             "Name": "k8scrd_ippool_crd_projectcalico_org_v1.baz",
-            "Path": [
-                "spec",
-                "cidr"
-            ],
+            "Path": ["manifest", "spec", "cidr"],
             "Value": "198.51.100.4/30"
         }
     ],

@@ -156,11 +156,6 @@ func main() {
 				continue
 			}
 			delete(objectTyp.AttrTypes, "kind")
-			if _, found := objectTyp.AttrTypes["count"]; found {
-				// Count is reserved at top-level in TF schemas. We could rename
-				// it, but skip for now.
-				continue
-			}
 
 			metaTyp, ok := objectTyp.AttrTypes["metadata"].(types.KubernetesObjectType)
 			if !ok {

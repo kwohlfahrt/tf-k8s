@@ -2,17 +2,17 @@
     "Properties": [
         {
             "Name": "data.k8scrd_deployment_apps_v1.foo",
-            "Path": ["spec", "replicas"],
+            "Path": ["manifest", "spec", "replicas"],
             "Value": 0
         },
         {
             "Name": "data.k8scrd_configmap_v1.foo",
-            "Path": ["data", "foo.txt"],
+            "Path": ["manifest", "data", "foo.txt"],
             "Value": "hello, world!\n"
         },
         {
             "Name": "data.k8scrd_namespace_v1.foo",
-            "Path": ["metadata", "name"],
+            "Path": ["manifest", "metadata", "name"],
             "Value": "foo"
         }
     ]

@@ -33,7 +33,6 @@ type KubernetesObjectType struct {
 
 	FieldNames     map[string]string
 	RequiredFields map[string]bool
-	InternalFields map[string]bool
 }
 
 func (t KubernetesObjectType) Equal(o attr.Type) bool {
@@ -51,9 +50,8 @@ func (t KubernetesObjectType) String() string {
 
 func (t KubernetesObjectType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
 	value := KubernetesObjectValue{
-		ObjectValue:    in,
-		fieldNames:     t.FieldNames,
-		internalFields: t.InternalFields,
+		ObjectValue: in,
+		fieldNames:  t.FieldNames,
 	}
 	return &value, nil
 }
@@ -105,11 +103,6 @@ func (t KubernetesObjectType) ValueFromUnstructured(
 
 	attributes := make(map[string]attr.Value, len(mapObj))
 	for k, attrType := range t.AttrTypes {
-		if t.InternalFields[k] {
-			attributes[k] = newNull(ctx, attrType)
-			continue
-		}
-
 		fieldPath := path.AtName(k)
 		fieldName, found := t.FieldNames[k]
 		if !found {
@@ -227,7 +220,6 @@ func ObjectFromOpenApi(root *spec3.OpenAPI, openapi spec.Schema, path []string) 
 		ObjectType:     basetypes.ObjectType{AttrTypes: attrTypes},
 		FieldNames:     fieldNames,
 		RequiredFields: requiredFields,
-		InternalFields: map[string]bool{},
 	}, nil
 }
 
@@ -308,8 +300,7 @@ type KubernetesValue interface {
 type KubernetesObjectValue struct {
 	basetypes.ObjectValue
 
-	fieldNames     map[string]string
-	internalFields map[string]bool
+	fieldNames map[string]string
 }
 
 func (v KubernetesObjectValue) Equal(o attr.Value) bool {
@@ -325,8 +316,7 @@ func (v KubernetesObjectValue) Type(ctx context.Context) attr.Type {
 		ObjectType: basetypes.ObjectType{
 			AttrTypes: v.AttributeTypes(ctx),
 		},
-		FieldNames:     v.fieldNames,
-		InternalFields: v.internalFields,
+		FieldNames: v.fieldNames,
 	}
 }
 
@@ -335,7 +325,7 @@ func (v KubernetesObjectValue) ToUnstructured(ctx context.Context, path path.Pat
 	attributes := v.Attributes()
 	result := make(map[string]interface{}, len(attributes))
 	for k, attr := range attributes {
-		if attr.IsNull() || attr.IsUnknown() || v.internalFields[k] {
+		if attr.IsNull() || attr.IsUnknown() {
 			continue
 		}
 
@@ -406,7 +396,7 @@ func (v KubernetesObjectValue) ManagedFields(ctx context.Context, path path.Path
 	}
 
 	for k, attr := range v.Attributes() {
-		if attr.IsNull() || v.internalFields[k] {
+		if attr.IsNull() {
 			continue
 		}
 

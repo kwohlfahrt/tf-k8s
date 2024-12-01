@@ -8,17 +8,15 @@ provider "k8scrd" {
 }
 
 resource "k8scrd_foo_example_com_v1" "bar" {
-  metadata = {
-    name      = "bar"
-    namespace = "default"
+  manifest = {
+    metadata = { name = "bar", namespace = "default" }
+    spec     = { foo = "bar" }
   }
-  spec = { foo = "bar" }
 }
 
 resource "k8scrd_bar_example_com_v1" "bar" {
-  metadata = {
-    name      = "bar"
-    namespace = "default"
+  manifest = {
+    metadata = { name = "bar", namespace = "default" }
+    spec     = { bar = "bar" }
   }
-  spec = { bar = "bar" }
 }

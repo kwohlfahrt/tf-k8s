@@ -8,8 +8,5 @@ provider "k8scrd" {
 }
 
 data "k8scrd_foo_example_com_v1" "foo" {
-  metadata = {
-    name      = "foo"
-    namespace = "default"
-  }
+  manifest = { metadata = { name = "foo", namespace = "default" } }
 }

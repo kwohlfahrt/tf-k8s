@@ -8,11 +8,10 @@ provider "k8scrd" {
 }
 
 resource "k8scrd_foo_example_com_v1" "baz" {
-  metadata = {
-    name      = "baz"
-    namespace = "default"
+  manifest = {
+    metadata = { name = "baz", namespace = "default" }
+    spec     = { foo = "baz" }
   }
-  spec = { foo = "baz" }
 }
 
 import {

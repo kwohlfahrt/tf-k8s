@@ -8,19 +8,13 @@ provider "k8scrd" {
 }
 
 data "k8scrd_deployment_apps_v1" "foo" {
-  metadata = {
-    name      = "foo"
-    namespace = "default"
-  }
+  manifest = { metadata = { name = "foo", namespace = "default" } }
 }
 
 data "k8scrd_configmap_v1" "foo" {
-  metadata = {
-    name      = "foo"
-    namespace = "default"
-  }
+  manifest = { metadata = { name = "foo", namespace = "default" } }
 }
 
 data "k8scrd_namespace_v1" "foo" {
-  metadata = { name = "foo" }
+  manifest = { metadata = { name = "foo" } }
 }

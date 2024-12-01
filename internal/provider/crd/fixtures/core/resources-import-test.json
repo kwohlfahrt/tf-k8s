@@ -2,18 +2,12 @@
     "Properties": [
         {
             "Name": "k8scrd_deployment_apps_v1.baz",
-            "Path": [
-                "spec",
-                "replicas"
-            ],
+            "Path": ["manifest", "spec", "replicas"],
             "Value": 0
         },
         {
             "Name": "k8scrd_namespace_v1.baz",
-            "Path": [
-                "metadata",
-                "name"
-            ],
+            "Path": ["manifest", "metadata", "name"],
             "Value": "baz"
         }
     ],
