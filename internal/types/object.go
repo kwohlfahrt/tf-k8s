@@ -356,38 +356,6 @@ func (v KubernetesObjectValue) ToUnstructured(ctx context.Context, path path.Pat
 	return result, diags
 }
 
-func DynamicObjectFromUnstructured(ctx context.Context, path path.Path, val map[string]interface{}) (basetypes.ObjectValuable, diag.Diagnostics) {
-	var diags diag.Diagnostics
-
-	attrValues := make(map[string]attr.Value, len(val))
-	attrTypes := make(map[string]attr.Type, len(val))
-	for k, v := range val {
-		fieldName := k
-		fieldPath := path.AtName(fieldName)
-		var attrValue attr.Value
-		var attrDiags diag.Diagnostics
-		switch v := v.(type) {
-		case map[string]interface{}:
-			attrValue, attrDiags = DynamicObjectFromUnstructured(ctx, fieldPath, v)
-		case []interface{}:
-			attrValue, attrDiags = dynamicTupleFromUnstructured(ctx, fieldPath, v)
-		default:
-			attrValue, attrDiags = dynamicPrimitiveFromUnstructured(ctx, fieldPath, v)
-		}
-		diags.Append(attrDiags...)
-		if attrDiags.HasError() {
-			continue
-		}
-
-		attrValues[fieldName] = attrValue
-		attrTypes[fieldName] = attrValue.Type(ctx)
-	}
-	obj, objDiags := basetypes.NewObjectValue(attrTypes, attrValues)
-	diags.Append(objDiags...)
-
-	return obj, diags
-}
-
 func (v KubernetesObjectValue) ManagedFields(ctx context.Context, path path.Path, fields *fieldpath.Set, pe *fieldpath.PathElement) diag.Diagnostics {
 	var diags diag.Diagnostics
 
