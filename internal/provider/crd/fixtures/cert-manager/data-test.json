@@ -1,0 +1,14 @@
+{
+    "Properties": [
+        {
+            "Name": "data.k8scrd_certificate_certmanager_io_v1.foo",
+            "Path": ["spec", "issuer_ref", "name"],
+            "Value": "self-signed"
+        },
+        {
+            "Name": "data.k8scrd_issuer_certmanager_io_v1.foo",
+            "Path": ["spec", "acme", "solvers", 0, "dns01", "webhook", "config", "x"],
+            "Value": "x"
+        }
+    ]
+}

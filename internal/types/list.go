@@ -130,16 +130,16 @@ func (t KubernetesListType) ValueFromUnstructured(ctx context.Context, path path
 	return result, diags
 }
 
-func (t KubernetesListType) SchemaType(ctx context.Context, required bool) (schema.Attribute, error) {
+func (t KubernetesListType) SchemaType(ctx context.Context, opts SchemaOptions, isRequired bool) (schema.Attribute, error) {
 	elem := t.ElementType()
 	if objectElem, ok := elem.(KubernetesObjectType); ok {
-		attributes, err := objectElem.SchemaAttributes(ctx, required)
+		attributes, err := objectElem.SchemaAttributes(ctx, opts, isRequired)
 		if err != nil {
 			return nil, err
 		}
 		return schema.ListNestedAttribute{
-			Required:   required,
-			Optional:   !required,
+			Required:   isRequired,
+			Optional:   !isRequired,
 			Computed:   false,
 			CustomType: t,
 			NestedObject: schema.NestedAttributeObject{
@@ -149,8 +149,8 @@ func (t KubernetesListType) SchemaType(ctx context.Context, required bool) (sche
 		}, nil
 	} else {
 		return schema.ListAttribute{
-			Required:    required,
-			Optional:    !required,
+			Required:    isRequired,
+			Optional:    !isRequired,
 			Computed:    false,
 			CustomType:  t,
 			ElementType: elem,

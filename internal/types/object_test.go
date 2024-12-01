@@ -42,7 +42,7 @@ var testSchema types.KubernetesObjectType = types.KubernetesObjectType{
 }
 
 func TestRequiredFields(t *testing.T) {
-	result, err := generic.OpenApiToTfSchema(context.Background(), testSchema)
+	result, err := generic.OpenApiToTfSchema(context.Background(), testSchema, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +56,7 @@ func TestRequiredFields(t *testing.T) {
 }
 
 func TestFieldType(t *testing.T) {
-	result, err := generic.OpenApiToTfSchema(context.Background(), testSchema)
+	result, err := generic.OpenApiToTfSchema(context.Background(), testSchema, false)
 	if err != nil {
 		t.Fatal(err)
 	}

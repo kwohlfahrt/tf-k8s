@@ -1,0 +1,44 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: foo
+spec:
+  issuerRef:
+    kind: ClusterIssuer
+    name: self-signed
+  dnsNames: ["example.com"]
+  duration: "2160h"
+  renewBefore: "360h"
+  secretName: example-com
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: baz
+spec:
+  issuerRef:
+    kind: ClusterIssuer
+    name: self-signed
+  dnsNames: ["example.org"]
+  duration: "2160h"
+  renewBefore: "360h"
+  secretName: example-org
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: foo
+spec:
+  acme:
+    email: user@example.com
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: qux
+    solvers:
+    - dns01:
+        webhook:
+          groupName: "foo"
+          solverName: "bar"
+          config:
+            x: "x"
+            y: { z: 3 }

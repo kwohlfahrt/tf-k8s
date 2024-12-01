@@ -1,0 +1,26 @@
+{
+    "Properties": [
+        {
+            "Name": "k8scrd_certificate_certmanager_io_v1.bar",
+            "Path": [
+                "spec",
+                "issuer_ref",
+                "name"
+            ],
+            "Value": "self-signed"
+        }
+    ],
+    "Resources": [
+        {
+            "GroupVersionResource": {
+                "group": "cert-manager.io",
+                "version": "v1",
+                "resource": "certificates"
+            },
+            "Metadata": {
+                "name": "bar",
+                "namespace": "default"
+            }
+        }
+    ]
+}
