@@ -122,7 +122,7 @@ func (t KubernetesObjectType) ValueFromUnstructured(
 
 		value, found := mapObj[fieldName]
 		// Handle the parsing/datasource case, where we don't have a field-manager
-		if fields == nil && (!found || value == nil) {
+		if fields == nil && !found {
 			attributes[k] = newNull(ctx, attrType)
 			continue
 		}

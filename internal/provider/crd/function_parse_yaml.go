@@ -78,6 +78,10 @@ func (f *ParseYAMLFunction) Run(ctx context.Context, req function.RunRequest, re
 
 func toUnstructured(obj attr.Value, path path.Path) (interface{}, diag.Diagnostics) {
 	var diags diag.Diagnostics
+	if obj.IsNull() {
+		return nil, diags
+	}
+
 	switch v := obj.(type) {
 	case basetypes.ObjectValue:
 		attrs := v.Attributes()
