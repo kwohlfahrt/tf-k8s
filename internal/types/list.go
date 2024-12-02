@@ -8,7 +8,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"k8s.io/kube-openapi/pkg/spec3"
@@ -153,15 +152,6 @@ func (t KubernetesListType) ValueFromUnstructured(ctx context.Context, path path
 	diags.Append(listDiags...)
 
 	return result, diags
-}
-
-func (t KubernetesListType) SchemaType(ctx context.Context, opts SchemaOptions, isRequired bool) (schema.Attribute, error) {
-	return schema.DynamicAttribute{
-		Required:   isRequired,
-		Optional:   !isRequired,
-		Computed:   false,
-		CustomType: t,
-	}, nil
 }
 
 func ListFromOpenApi(root *spec3.OpenAPI, openapi spec.Schema, path []string) (KubernetesType, error) {

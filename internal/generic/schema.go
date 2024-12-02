@@ -40,7 +40,7 @@ func (t TypeInfo) Interface(client *dynamic.DynamicClient, namespace string) dyn
 }
 
 func OpenApiToTfSchema(ctx context.Context, typeInfo TypeInfo, isDatasSource bool) (schema.Attribute, error) {
-	attr, err := typeInfo.Schema.SchemaType(ctx, types.SchemaOptions{IsDataSource: isDatasSource}, false)
+	attr, err := typeInfo.Schema.SchemaType(ctx, true)
 	if err != nil {
 		return nil, err
 	}
