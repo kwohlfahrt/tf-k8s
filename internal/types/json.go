@@ -111,6 +111,12 @@ func (t KubernetesUnknownType) ValueFromUnstructured(ctx context.Context, path p
 	return KubernetesUnknownValue{DynamicValue: dynamicValue}, diags
 }
 
+func (t KubernetesUnknownType) ForDataSource(ctx context.Context, topLevel bool) KubernetesType {
+	return KubernetesListType{
+		DynamicType: t.DynamicType,
+	}
+}
+
 var _ basetypes.DynamicTypable = KubernetesUnknownType{}
 var _ KubernetesType = KubernetesUnknownType{}
 

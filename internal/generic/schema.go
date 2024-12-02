@@ -40,7 +40,12 @@ func (t TypeInfo) Interface(client *dynamic.DynamicClient, namespace string) dyn
 }
 
 func OpenApiToTfSchema(ctx context.Context, typeInfo TypeInfo, isDatasSource bool) (schema.Attribute, error) {
-	attr, err := typeInfo.Schema.SchemaType(ctx, true)
+	schemaType := typeInfo.Schema
+	if isDatasSource {
+		schemaType = schemaType.ForDataSource(ctx, true).(types.KubernetesObjectType)
+	}
+
+	attr, err := schemaType.SchemaType(ctx, true)
 	if err != nil {
 		return nil, err
 	}

@@ -23,6 +23,7 @@ type KubernetesType interface {
 	attr.Type
 
 	ValueFromUnstructured(ctx context.Context, path path.Path, fields *fieldpath.Set, obj interface{}) (attr.Value, diag.Diagnostics)
+	ForDataSource(ctx context.Context, topLevel bool) KubernetesType
 }
 
 type KubernetesObjectType struct {
@@ -189,6 +190,28 @@ func (t KubernetesObjectType) SchemaType(ctx context.Context, isRequired bool) (
 		Computed:   false,
 		CustomType: t,
 	}, nil
+}
+
+func (t KubernetesObjectType) ForDataSource(ctx context.Context, topLevel bool) KubernetesType {
+	requiredFields := map[string]bool{}
+	if topLevel {
+		requiredFields["metadata"] = true
+	}
+	attrTypes := make(map[string]attr.Type, len(t.AttrTypes))
+	for k, attrType := range t.AttrTypes {
+		if kubernetesAttrType, ok := attrType.(KubernetesType); ok {
+			attrTypes[k] = kubernetesAttrType.ForDataSource(ctx, false)
+		} else {
+			attrTypes[k] = attrType
+		}
+	}
+
+	return KubernetesObjectType{
+		DynamicType:    t.DynamicType,
+		AttrTypes:      t.AttrTypes,
+		FieldNames:     t.FieldNames,
+		RequiredFields: requiredFields,
+	}
 }
 
 func ObjectFromOpenApi(root *spec3.OpenAPI, openapi spec.Schema, path []string) (KubernetesType, error) {

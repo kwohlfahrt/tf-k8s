@@ -157,6 +157,20 @@ func MapFromOpenApi(root *spec3.OpenAPI, openapi spec.Schema, path []string) (Ku
 	return KubernetesMapType{DynamicType: basetypes.DynamicType{}, ElemType: elemType}, nil
 }
 
+func (t KubernetesMapType) ForDataSource(ctx context.Context, topLevel bool) KubernetesType {
+	var elemType attr.Type
+	if kubernetesElemType, ok := t.ElemType.(KubernetesType); ok {
+		elemType = kubernetesElemType.ForDataSource(ctx, false)
+	} else {
+		elemType = t.ElemType
+	}
+
+	return KubernetesMapType{
+		DynamicType: t.DynamicType,
+		ElemType:    elemType,
+	}
+}
+
 var _ basetypes.DynamicTypable = KubernetesMapType{}
 var _ KubernetesType = KubernetesMapType{}
 

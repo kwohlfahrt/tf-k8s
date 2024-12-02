@@ -91,6 +91,21 @@ func (t KubernetesUnionType) ValueType(ctx context.Context) attr.Value {
 	}
 }
 
+func (t KubernetesUnionType) ForDataSource(ctx context.Context, topLevel bool) KubernetesType {
+	members := make([]attr.Type, len(t.Members))
+	for _, member := range t.Members {
+		if kubernetesMember, ok := member.(KubernetesType); ok {
+			members = append(members, kubernetesMember.ForDataSource(ctx, false))
+		} else {
+			members = append(members, member)
+		}
+	}
+	return KubernetesUnionType{
+		DynamicType: t.DynamicType,
+		Members:     members,
+	}
+}
+
 var _ basetypes.DynamicTypable = KubernetesUnionType{}
 var _ KubernetesType = KubernetesUnionType{}
 

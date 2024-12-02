@@ -154,6 +154,21 @@ func (t KubernetesListType) ValueFromUnstructured(ctx context.Context, path path
 	return result, diags
 }
 
+func (t KubernetesListType) ForDataSource(ctx context.Context, topLevel bool) KubernetesType {
+	var elemType attr.Type
+	if kubernetesElemType, ok := t.ElemType.(KubernetesType); ok {
+		elemType = kubernetesElemType.ForDataSource(ctx, false)
+	} else {
+		elemType = t.ElemType
+	}
+
+	return KubernetesListType{
+		DynamicType: t.DynamicType,
+		Keys:        t.Keys,
+		ElemType:    elemType,
+	}
+}
+
 func ListFromOpenApi(root *spec3.OpenAPI, openapi spec.Schema, path []string) (KubernetesType, error) {
 	items := openapi.Items.Schema
 	if items == nil {
