@@ -416,7 +416,7 @@ func (v KubernetesObjectValue) Validate(ctx context.Context, path path.Path) dia
 
 	attrs := v.Attributes()
 	missingAttributes := make([]string, 0)
-	for k, _ := range v.requiredFields {
+	for k := range v.requiredFields {
 		if _, found := attrs[k]; !found {
 			missingAttributes = append(missingAttributes, k)
 		}

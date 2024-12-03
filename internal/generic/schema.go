@@ -73,19 +73,23 @@ func (v metadataValidator) MarkdownDescription(ctx context.Context) string {
 }
 
 func (v metadataValidator) ValidateDynamic(ctx context.Context, req validator.DynamicRequest, resp *validator.DynamicResponse) {
+	if req.ConfigValue.IsUnknown() || req.ConfigValue.IsUnderlyingValueUnknown() {
+		return
+	}
+
 	underlying := req.ConfigValue.UnderlyingValue()
 	value, ok := underlying.(basetypes.ObjectValue)
 	if !ok {
 		resp.Diagnostics.AddAttributeError(req.Path, "Unexpected value type", fmt.Sprintf("Expected object, got %T", underlying))
 		return
 	}
+
 	metadataPath := req.Path.AtName("metadata")
 	metadataValue, found := value.Attributes()["metadata"]
 	if !found {
 		resp.Diagnostics.AddAttributeError(metadataPath, "Missing metadata value", "Manifest does not contain metadata")
 		return
 	}
-
 	metadata, ok := metadataValue.(types.KubernetesObjectValue)
 	if !ok {
 		resp.Diagnostics.AddAttributeError(metadataPath, "Unexpected value type", fmt.Sprintf("Expected object, got %T", underlying))
