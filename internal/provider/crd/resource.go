@@ -221,7 +221,7 @@ func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, 
 		return
 	}
 
-	if importFieldManager != nil {
+	if importFieldManager != nil && *importFieldManager != fieldManager {
 		empty := unstructured.Unstructured{Object: map[string]interface{}{
 			"apiVersion": c.typeInfo.GroupVersionResource().GroupVersion().String(),
 			"kind":       c.typeInfo.Kind,
