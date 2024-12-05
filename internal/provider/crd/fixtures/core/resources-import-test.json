@@ -6,7 +6,7 @@
             "Value": 0
         },
         {
-            "Name": "k8scrd_namespace_v1.baz",
+            "Name": "k8scrd_clusterrolebinding_rbac_authorization_k8s_io_v1.baz",
             "Path": ["manifest", "metadata", "name"],
             "Value": "baz"
         }

@@ -3,14 +3,15 @@ package types
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
-	"github.com/hashicorp/terraform-plugin-framework/attr/xattr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
-	"github.com/hashicorp/terraform-plugin-framework/function"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	strcase "github.com/stoewer/go-strcase"
@@ -23,7 +24,7 @@ type KubernetesType interface {
 	attr.Type
 
 	ValueFromUnstructured(ctx context.Context, path path.Path, fields *fieldpath.Set, obj interface{}) (attr.Value, diag.Diagnostics)
-	ForDataSource(ctx context.Context, topLevel bool) KubernetesType
+	Validate(ctx context.Context, path path.Path, value attr.Value, isDataSource bool) diag.Diagnostics
 }
 
 type KubernetesObjectType struct {
@@ -183,35 +184,18 @@ func (t KubernetesObjectType) ValueFromUnstructured(
 	return result, diags
 }
 
-func (t KubernetesObjectType) SchemaType(ctx context.Context, isRequired bool) (schema.Attribute, error) {
-	return schema.DynamicAttribute{
-		Required:   isRequired,
-		Optional:   !isRequired,
-		Computed:   false,
-		CustomType: t,
-	}, nil
+type SchemaTypeOpts struct {
+	IsDataSource bool
 }
 
-func (t KubernetesObjectType) ForDataSource(ctx context.Context, topLevel bool) KubernetesType {
-	requiredFields := map[string]bool{}
-	if topLevel {
-		requiredFields["metadata"] = true
-	}
-	attrTypes := make(map[string]attr.Type, len(t.AttrTypes))
-	for k, attrType := range t.AttrTypes {
-		if kubernetesAttrType, ok := attrType.(KubernetesType); ok {
-			attrTypes[k] = kubernetesAttrType.ForDataSource(ctx, false)
-		} else {
-			attrTypes[k] = attrType
-		}
-	}
-
-	return KubernetesObjectType{
-		DynamicType:    t.DynamicType,
-		AttrTypes:      t.AttrTypes,
-		FieldNames:     t.FieldNames,
-		RequiredFields: requiredFields,
-	}
+func (t KubernetesObjectType) SchemaType(ctx context.Context, opts SchemaTypeOpts) (schema.Attribute, error) {
+	return schema.DynamicAttribute{
+		Required:   true,
+		Optional:   false,
+		Computed:   false,
+		CustomType: t,
+		Validators: []validator.Dynamic{t.Validator(ctx, opts.IsDataSource)},
+	}, nil
 }
 
 func ObjectFromOpenApi(root *spec3.OpenAPI, openapi spec.Schema, path []string) (KubernetesType, error) {
@@ -242,6 +226,94 @@ func ObjectFromOpenApi(root *spec3.OpenAPI, openapi spec.Schema, path []string) 
 		FieldNames:     fieldNames,
 		RequiredFields: requiredFields,
 	}, nil
+}
+
+func (t KubernetesObjectType) Validate(ctx context.Context, path path.Path, in attr.Value, isDataSource bool) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	var attrs map[string]attr.Value
+	switch in := in.(type) {
+	case KubernetesObjectValue:
+		if in.IsNull() || in.IsUnknown() || in.IsUnderlyingValueNull() || in.IsUnderlyingValueUnknown() {
+			return diags
+		}
+		attrs = in.Attributes()
+	case basetypes.DynamicValue:
+		if in.IsNull() || in.IsUnknown() || in.IsUnderlyingValueNull() || in.IsUnderlyingValueUnknown() {
+			return diags
+		}
+		if inObject, ok := in.UnderlyingValue().(basetypes.ObjectValue); ok {
+			attrs = inObject.Attributes()
+		} else {
+			diags.Append(diag.NewAttributeErrorDiagnostic(
+				path, "Unexpected value type", fmt.Sprintf("Expected dynamic object value, got %T", in),
+			))
+			return diags
+		}
+	default:
+		diags.Append(diag.NewAttributeErrorDiagnostic(
+			path, "Unexpected value type", fmt.Sprintf("Expected KubernetesObjectValue, got %T", in),
+		))
+		return diags
+	}
+
+	extraAttrs := make(map[string]bool, 0)
+	missingAttrs := maps.Clone(t.RequiredFields)
+	for field := range t.RequiredFields {
+		missingAttrs[field] = true
+	}
+
+	for k, attr := range attrs {
+		attrType, found := t.AttrTypes[k]
+		if !found {
+			extraAttrs[k] = true
+		} else {
+			delete(missingAttrs, k)
+		}
+		if kubernetesAttrType, ok := attrType.(KubernetesType); ok {
+			diags.Append(kubernetesAttrType.Validate(ctx, path.AtMapKey(k), attr, isDataSource)...)
+		}
+	}
+
+	if len(extraAttrs) > 0 {
+		extraAttrNames := slices.Collect(maps.Keys(extraAttrs))
+		diags.Append(diag.NewAttributeErrorDiagnostic(
+			path, "Extra fields found", fmt.Sprintf("extra fields: %s", strings.Join(extraAttrNames, ", ")),
+		))
+	}
+
+	if len(missingAttrs) > 0 && !isDataSource {
+		missingAttrNames := slices.Collect(maps.Keys(missingAttrs))
+		diags.Append(diag.NewAttributeErrorDiagnostic(
+			path, "Missing required fields", fmt.Sprintf("missing fields: %s", strings.Join(missingAttrNames, ", ")),
+		))
+	}
+
+	return diags
+}
+
+func (t KubernetesObjectType) Validator(ctx context.Context, isDataSource bool) validator.Dynamic {
+	return objectValidator{
+		t:            t,
+		isDataSource: isDataSource,
+	}
+}
+
+type objectValidator struct {
+	t            KubernetesObjectType
+	isDataSource bool
+}
+
+func (v objectValidator) Description(ctx context.Context) string {
+	return "Object Validator"
+}
+
+func (v objectValidator) MarkdownDescription(ctx context.Context) string {
+	return "Object Validator"
+}
+
+func (v objectValidator) ValidateDynamic(ctx context.Context, req validator.DynamicRequest, resp *validator.DynamicResponse) {
+	resp.Diagnostics.Append(v.t.Validate(ctx, req.Path, req.ConfigValue, v.isDataSource)...)
 }
 
 func OpenApiToTfType(root *spec3.OpenAPI, openapi spec.Schema, path []string) (attr.Type, error) {
@@ -316,7 +388,6 @@ type KubernetesValue interface {
 
 	ToUnstructured(ctx context.Context, path path.Path) (interface{}, diag.Diagnostics)
 	ManagedFields(ctx context.Context, path path.Path, fields *fieldpath.Set, pe *fieldpath.PathElement) diag.Diagnostics
-	Validate(ctx context.Context, path path.Path) diag.Diagnostics
 }
 
 type KubernetesObjectValue struct {
@@ -407,57 +478,5 @@ func (v KubernetesObjectValue) ManagedFields(ctx context.Context, path path.Path
 	return diags
 }
 
-func (v KubernetesObjectValue) Validate(ctx context.Context, path path.Path) diag.Diagnostics {
-	var diags diag.Diagnostics
-
-	if v.IsNull() || v.IsUnknown() || v.IsUnderlyingValueNull() || v.IsUnderlyingValueUnknown() {
-		return diags
-	}
-
-	attrs := v.Attributes()
-	missingAttributes := make([]string, 0)
-	for k := range v.requiredFields {
-		if _, found := attrs[k]; !found {
-			missingAttributes = append(missingAttributes, k)
-		}
-	}
-	if len(missingAttributes) > 0 {
-		diags.Append(diag.NewAttributeErrorDiagnostic(
-			path, "Missing required values",
-			fmt.Sprintf("missing keys: %s", strings.Join(missingAttributes, ", ")),
-		))
-	}
-
-	extraAttributes := make([]string, 0)
-	for k, elem := range attrs {
-		if kubernetesElem, ok := elem.(KubernetesValue); ok {
-			diags.Append(kubernetesElem.Validate(ctx, path.AtName(k))...)
-		}
-		if _, found := v.attrTypes[k]; !found {
-			extraAttributes = append(extraAttributes, k)
-		}
-	}
-
-	if len(extraAttributes) > 0 {
-		diags.Append(diag.NewAttributeWarningDiagnostic(
-			path, "Unrecognized values",
-			fmt.Sprintf("extra keys: %s", strings.Join(extraAttributes, ", ")),
-		))
-	}
-
-	return diags
-}
-
-func (v KubernetesObjectValue) ValidateAttribute(ctx context.Context, req xattr.ValidateAttributeRequest, resp *xattr.ValidateAttributeResponse) {
-	resp.Diagnostics = v.Validate(ctx, req.Path)
-}
-
-func (v KubernetesObjectValue) ValidateParameter(ctx context.Context, req function.ValidateParameterRequest, resp *function.ValidateParameterResponse) {
-	diags := v.Validate(ctx, path.Empty().AtListIndex(int(req.Position)))
-	resp.Error = function.FuncErrorFromDiags(ctx, diags)
-}
-
 var _ basetypes.DynamicValuable = KubernetesObjectValue{}
 var _ KubernetesValue = KubernetesObjectValue{}
-var _ xattr.ValidateableAttribute = KubernetesObjectValue{}
-var _ function.ValidateableParameter = KubernetesObjectValue{}

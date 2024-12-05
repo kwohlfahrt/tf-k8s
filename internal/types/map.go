@@ -157,18 +157,26 @@ func MapFromOpenApi(root *spec3.OpenAPI, openapi spec.Schema, path []string) (Ku
 	return KubernetesMapType{DynamicType: basetypes.DynamicType{}, ElemType: elemType}, nil
 }
 
-func (t KubernetesMapType) ForDataSource(ctx context.Context, topLevel bool) KubernetesType {
-	var elemType attr.Type
-	if kubernetesElemType, ok := t.ElemType.(KubernetesType); ok {
-		elemType = kubernetesElemType.ForDataSource(ctx, false)
-	} else {
-		elemType = t.ElemType
+func (t KubernetesMapType) Validate(ctx context.Context, path path.Path, in attr.Value, isDataSource bool) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	value, ok := in.(KubernetesMapValue)
+	if !ok {
+		diags.Append(diag.NewAttributeErrorDiagnostic(
+			path, "Unexpected value type", fmt.Sprintf("Expected KubernetesMapValue, got %T", in),
+		))
+	}
+	if value.IsNull() || value.IsUnknown() || value.IsUnderlyingValueNull() || value.IsUnderlyingValueUnknown() {
+		return diags
 	}
 
-	return KubernetesMapType{
-		DynamicType: t.DynamicType,
-		ElemType:    elemType,
+	if elemType, ok := t.ElemType.(KubernetesType); ok {
+		for k, elem := range value.Attributes() {
+			diags.Append(elemType.Validate(ctx, path.AtMapKey(k), elem, isDataSource)...)
+		}
 	}
+
+	return diags
 }
 
 var _ basetypes.DynamicTypable = KubernetesMapType{}
@@ -235,21 +243,6 @@ func (v KubernetesMapValue) ManagedFields(ctx context.Context, path path.Path, f
 			diags.Append(kubernetesAttr.ManagedFields(ctx, fieldPath, fields, &pathElem)...)
 		} else {
 			fields.Insert([]fieldpath.PathElement{pathElem})
-		}
-	}
-
-	return diags
-}
-
-func (v KubernetesMapValue) Validate(ctx context.Context, path path.Path) diag.Diagnostics {
-	var diags diag.Diagnostics
-	if v.IsNull() || v.IsUnknown() || v.IsUnderlyingValueNull() || v.IsUnderlyingValueUnknown() {
-		return diags
-	}
-
-	for k, elem := range v.Attributes() {
-		if kubernetesElem, ok := elem.(KubernetesValue); ok {
-			diags.Append(kubernetesElem.Validate(ctx, path.AtMapKey(k))...)
 		}
 	}
 

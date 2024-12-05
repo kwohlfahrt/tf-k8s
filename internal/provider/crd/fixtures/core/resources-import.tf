@@ -43,7 +43,6 @@ resource "k8scrd_clusterrolebinding_rbac_authorization_k8s_io_v1" "baz" {
       kind      = "ClusterRole"
       name      = "system:node"
     }
-    subjects = []
   }
 }
 

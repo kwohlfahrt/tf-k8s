@@ -154,19 +154,27 @@ func (t KubernetesListType) ValueFromUnstructured(ctx context.Context, path path
 	return result, diags
 }
 
-func (t KubernetesListType) ForDataSource(ctx context.Context, topLevel bool) KubernetesType {
-	var elemType attr.Type
-	if kubernetesElemType, ok := t.ElemType.(KubernetesType); ok {
-		elemType = kubernetesElemType.ForDataSource(ctx, false)
-	} else {
-		elemType = t.ElemType
+func (t KubernetesListType) Validate(ctx context.Context, path path.Path, in attr.Value, isDataSource bool) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	value, ok := in.(KubernetesListValue)
+	if !ok {
+		diags.Append(diag.NewAttributeErrorDiagnostic(
+			path, "Unexpected value type", fmt.Sprintf("Expected KubernetesListValue, got %T", in),
+		))
 	}
 
-	return KubernetesListType{
-		DynamicType: t.DynamicType,
-		Keys:        t.Keys,
-		ElemType:    elemType,
+	if value.IsNull() || value.IsUnknown() || value.IsUnderlyingValueNull() || value.IsUnderlyingValueUnknown() {
+		return diags
 	}
+
+	if kubernetesElem, ok := t.ElemType.(KubernetesType); ok {
+		for i, elem := range value.Elements() {
+			diags.Append(kubernetesElem.Validate(ctx, path.AtListIndex(i), elem, isDataSource)...)
+		}
+	}
+
+	return diags
 }
 
 func ListFromOpenApi(root *spec3.OpenAPI, openapi spec.Schema, path []string) (KubernetesType, error) {
@@ -281,21 +289,6 @@ func (v KubernetesListValue) ManagedFields(ctx context.Context, path path.Path, 
 			diags.Append(kubernetesAttr.ManagedFields(ctx, fieldPath, fields, &pathElem)...)
 		} else {
 			fields.Insert([]fieldpath.PathElement{pathElem})
-		}
-	}
-
-	return diags
-}
-
-func (v KubernetesListValue) Validate(ctx context.Context, path path.Path) diag.Diagnostics {
-	var diags diag.Diagnostics
-	if v.IsNull() || v.IsUnknown() || v.IsUnderlyingValueNull() || v.IsUnderlyingValueUnknown() {
-		return diags
-	}
-
-	for i, elem := range v.Elements() {
-		if kubernetesElem, ok := elem.(KubernetesValue); ok {
-			diags.Append(kubernetesElem.Validate(ctx, path.AtListIndex(i))...)
 		}
 	}
 

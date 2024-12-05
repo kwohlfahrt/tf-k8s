@@ -111,10 +111,9 @@ func (t KubernetesUnknownType) ValueFromUnstructured(ctx context.Context, path p
 	return KubernetesUnknownValue{DynamicValue: dynamicValue}, diags
 }
 
-func (t KubernetesUnknownType) ForDataSource(ctx context.Context, topLevel bool) KubernetesType {
-	return KubernetesListType{
-		DynamicType: t.DynamicType,
-	}
+func (t KubernetesUnknownType) Validate(ctx context.Context, path path.Path, in attr.Value, isDataSource bool) diag.Diagnostics {
+	// TODO
+	return nil
 }
 
 var _ basetypes.DynamicTypable = KubernetesUnknownType{}
@@ -236,11 +235,6 @@ func (v KubernetesUnknownValue) ManagedFields(ctx context.Context, path path.Pat
 		fields.Insert([]fieldpath.PathElement{*pe})
 		return nil
 	}
-}
-
-func (v KubernetesUnknownValue) Validate(ctx context.Context, path path.Path) diag.Diagnostics {
-	// TODO
-	return nil
 }
 
 var _ basetypes.DynamicValuable = KubernetesUnknownValue{}
