@@ -3,6 +3,9 @@ apiGroups:
   - apps
   - batch
   - rbac.authorization.k8s.io
+  - storage.k8s.io
+  - networking.k8s.io
+  - admissionregistration.k8s.io
 defaults:
   io.k8s.api.core.v1.ObjectFieldSelector:
     property: apiVersion

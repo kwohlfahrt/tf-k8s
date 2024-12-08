@@ -92,15 +92,18 @@ func (v metadataValidator) ValidateDynamic(ctx context.Context, req validator.Dy
 		resp.Diagnostics.AddAttributeError(metadataPath, "Unexpected value type", fmt.Sprintf("Expected object, got %T", underlying))
 		return
 	}
+	if metadata.IsUnknown() || metadata.IsUnderlyingValueUnknown() {
+		return
+	}
 
 	attributes := metadata.Attributes()
 
-	name := attributes["name"]
-	if name.IsNull() {
+	name, found := attributes["name"]
+	if !found || name.IsNull() {
 		resp.Diagnostics.AddAttributeError(metadataPath.AtName("name"), "Missing attribute", "Manifest does not contain metadata.name")
 	}
 	namespace := attributes["namespace"]
-	if v.isNamespaced && namespace.IsNull() {
+	if v.isNamespaced && (!found || namespace.IsNull()) {
 		resp.Diagnostics.AddAttributeError(metadataPath.AtName("name"), "Missing attribute", "Manifest does not contain metadata.namespace")
 	}
 }
