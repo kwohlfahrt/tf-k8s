@@ -8,5 +8,5 @@ provider "k8scrd" {
 }
 
 data "k8scrd_ippool_crd_projectcalico_org_v1" "foo" {
-  manifest = { metadata = { name = "foo", namespace = "default" } }
+  manifest = { metadata = { name = "foo" } }
 }
