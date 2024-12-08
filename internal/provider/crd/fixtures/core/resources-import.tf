@@ -35,11 +35,18 @@ import {
   id = "kubectl:default/baz"
 }
 
-resource "k8scrd_namespace_v1" "baz" {
-  manifest = { metadata = { name = "baz" } }
+resource "k8scrd_clusterrolebinding_rbac_authorization_k8s_io_v1" "baz" {
+  manifest = {
+    metadata = { name = "baz" }
+    role_ref = {
+      api_group = "rbac.authorization.k8s.io"
+      kind      = "ClusterRole"
+      name      = "system:node"
+    }
+  }
 }
 
 import {
-  to = k8scrd_namespace_v1.baz
+  to = k8scrd_clusterrolebinding_rbac_authorization_k8s_io_v1.baz
   id = "kubectl:baz"
 }

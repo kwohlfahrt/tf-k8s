@@ -28,7 +28,6 @@ func init() {
 	gob.Register(basetypes.Float64Type{})
 	gob.Register(basetypes.NumberType{})
 	gob.Register(basetypes.StringType{})
-	gob.Register(basetypes.StringType{})
 
 	reader := bytes.NewReader(typeInfos)
 	dec := gob.NewDecoder(reader)

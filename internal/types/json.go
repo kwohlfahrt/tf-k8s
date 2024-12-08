@@ -7,7 +7,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
@@ -24,15 +23,6 @@ func (t KubernetesUnknownType) Equal(o attr.Type) bool {
 	}
 
 	return t.DynamicType.Equal(other.DynamicType)
-}
-
-func (t KubernetesUnknownType) SchemaType(ctx context.Context, opts SchemaOptions, isRequired bool) (schema.Attribute, error) {
-	return schema.DynamicAttribute{
-		CustomType: t,
-		Required:   isRequired,
-		Optional:   !isRequired,
-		Computed:   false,
-	}, nil
 }
 
 func (t KubernetesUnknownType) String() string {
@@ -119,6 +109,11 @@ func (t KubernetesUnknownType) ValueFromUnstructured(ctx context.Context, path p
 	}
 	dynamicValue := basetypes.NewDynamicValue(value)
 	return KubernetesUnknownValue{DynamicValue: dynamicValue}, diags
+}
+
+func (t KubernetesUnknownType) Validate(ctx context.Context, path path.Path, in attr.Value, isDataSource bool) diag.Diagnostics {
+	// TODO
+	return nil
 }
 
 var _ basetypes.DynamicTypable = KubernetesUnknownType{}

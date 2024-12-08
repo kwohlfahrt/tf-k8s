@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
@@ -19,22 +20,32 @@ type PlanOrState interface {
 	GetAttribute(ctx context.Context, path path.Path, target interface{}) diag.Diagnostics
 }
 
-func StateToValue(ctx context.Context, state PlanOrState, typeInfo TypeInfo) (types.KubernetesValue, diag.Diagnostics) {
+type Schema interface {
+	Type() attr.Type
+}
+
+type ObjectMeta struct {
+	Name      string
+	Namespace string
+}
+
+func StateToObjectMeta(ctx context.Context, state PlanOrState, typeInfo TypeInfo, meta *ObjectMeta) diag.Diagnostics {
 	var diags diag.Diagnostics
 
-	var stateValue basetypes.ObjectValue
-	diags.Append(state.GetAttribute(ctx, path.Root("manifest"), &stateValue)...)
+	var manifest types.KubernetesObjectValue
+	diags.Append(state.GetAttribute(ctx, path.Root("manifest"), &manifest)...)
 	if diags.HasError() {
-		return nil, diags
+		return diags
 	}
 
-	value, valueDiags := typeInfo.Schema.ValueFromObject(ctx, stateValue)
-	diags.Append(valueDiags...)
-	if diags.HasError() {
-		return nil, diags
+	attrs := manifest.Attributes()
+	metaAttrs := attrs["metadata"].(types.KubernetesObjectValue).Attributes()
+	meta.Name = metaAttrs["name"].(basetypes.StringValue).ValueString()
+	if typeInfo.Namespaced {
+		meta.Namespace = metaAttrs["namespace"].(basetypes.StringValue).ValueString()
 	}
-	objectValue := value.(*types.KubernetesObjectValue)
-	return objectValue, diags
+
+	return diags
 }
 
 type PrivateState interface {

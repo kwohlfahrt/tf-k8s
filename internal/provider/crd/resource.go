@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/generic"
+	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -42,7 +43,7 @@ func (c *crdResource) Metadata(ctx context.Context, req tfresource.MetadataReque
 }
 
 func (c *crdResource) Schema(ctx context.Context, req tfresource.SchemaRequest, resp *tfresource.SchemaResponse) {
-	result, err := generic.OpenApiToTfSchema(ctx, c.typeInfo.Schema, false)
+	result, err := generic.OpenApiToTfSchema(ctx, c.typeInfo, false)
 	if err != nil {
 		resp.Diagnostics.AddError("Could not convert CRD to schema", err.Error())
 		return
@@ -81,18 +82,14 @@ func (c *crdResource) Configure(ctx context.Context, req tfresource.ConfigureReq
 const fieldManager string = "tofu-k8scrd"
 
 func (c *crdResource) Create(ctx context.Context, req tfresource.CreateRequest, resp *tfresource.CreateResponse) {
-	var name, namespace string
-	metadataPath := path.Root("manifest").AtName("metadata")
-	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, metadataPath.AtName("name"), &name)...)
-	if c.typeInfo.Namespaced {
-		resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, metadataPath.AtName("namespace"), &namespace)...)
-	}
+	var meta generic.ObjectMeta
+	resp.Diagnostics.Append(generic.StateToObjectMeta(ctx, req.Plan, c.typeInfo, &meta)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	state, diags := generic.StateToValue(ctx, req.Plan, c.typeInfo)
-	resp.Diagnostics.Append(diags...)
+	var state types.KubernetesObjectValue
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("manifest"), &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -106,7 +103,8 @@ func (c *crdResource) Create(ctx context.Context, req tfresource.CreateRequest, 
 	// conflict fail if it was created by a different tool, but if we created it
 	// and forgot, this will silently adopt the object. We could generate a
 	// unique `FieldManager` ID per resource, and persist it in the TF state.
-	obj, err := c.typeInfo.Interface(c.client, namespace).Apply(ctx, name, planObj, metav1.ApplyOptions{FieldManager: fieldManager})
+	obj, err := c.typeInfo.Interface(c.client, meta.Namespace).
+		Apply(ctx, meta.Name, planObj, metav1.ApplyOptions{FieldManager: fieldManager})
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to create resource", err.Error())
 		return
@@ -117,19 +115,12 @@ func (c *crdResource) Create(ctx context.Context, req tfresource.CreateRequest, 
 	if diags.HasError() {
 		return
 	}
-	diags = state.ManagedFields(ctx, path.Empty(), fields, nil)
-	resp.Diagnostics.Append(diags...)
-	if diags.HasError() {
+	resp.Diagnostics.Append(state.ManagedFields(ctx, path.Empty(), fields, nil)...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
-	state, diags = generic.UnstructuredToValue(ctx, c.typeInfo.Schema, *obj, fields.Leaves())
-	resp.Diagnostics.Append(diags...)
-	if diags.HasError() {
-		return
-	}
-
-	resp.Diagnostics.Append(diags...)
-	if diags.HasError() {
+	resp.Diagnostics.Append(generic.UnstructuredToValue(ctx, c.typeInfo.Schema, *obj, fields.Leaves(), &state)...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
@@ -138,17 +129,13 @@ func (c *crdResource) Create(ctx context.Context, req tfresource.CreateRequest, 
 }
 
 func (c *crdResource) Read(ctx context.Context, req tfresource.ReadRequest, resp *tfresource.ReadResponse) {
-	var name, namespace string
-	metadataPath := path.Root("manifest").AtName("metadata")
-	resp.Diagnostics.Append(req.State.GetAttribute(ctx, metadataPath.AtName("name"), &name)...)
-	if c.typeInfo.Namespaced {
-		resp.Diagnostics.Append(req.State.GetAttribute(ctx, metadataPath.AtName("namespace"), &namespace)...)
-	}
+	var meta generic.ObjectMeta
+	resp.Diagnostics.Append(generic.StateToObjectMeta(ctx, req.State, c.typeInfo, &meta)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	state, diags := generic.StateToValue(ctx, req.State, c.typeInfo)
-	resp.Diagnostics.Append(diags...)
+	var state types.KubernetesObjectValue
+	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("manifest"), &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -158,7 +145,7 @@ func (c *crdResource) Read(ctx context.Context, req tfresource.ReadRequest, resp
 		return
 	}
 
-	obj, err := c.typeInfo.Interface(c.client, namespace).Get(ctx, name, metav1.GetOptions{})
+	obj, err := c.typeInfo.Interface(c.client, meta.Namespace).Get(ctx, meta.Name, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsGone(err) || errors.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -178,15 +165,13 @@ func (c *crdResource) Read(ctx context.Context, req tfresource.ReadRequest, resp
 	if diags.HasError() {
 		return
 	}
-	diags = state.ManagedFields(ctx, path.Empty(), fields, nil)
-	resp.Diagnostics.Append(diags...)
-	if diags.HasError() {
+	resp.Diagnostics.Append(state.ManagedFields(ctx, path.Empty(), fields, nil)...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	state, diags = generic.UnstructuredToValue(ctx, c.typeInfo.Schema, *obj, fields.Leaves())
-	resp.Diagnostics.Append(diags...)
-	if diags.HasError() {
+	resp.Diagnostics.Append(generic.UnstructuredToValue(ctx, c.typeInfo.Schema, *obj, fields.Leaves(), &state)...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
@@ -204,18 +189,14 @@ func (c *crdResource) Read(ctx context.Context, req tfresource.ReadRequest, resp
 }
 
 func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, resp *tfresource.UpdateResponse) {
-	var name, namespace string
-	metadataPath := path.Root("manifest").AtName("metadata")
-	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, metadataPath.AtName("name"), &name)...)
-	if c.typeInfo.Namespaced {
-		resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, metadataPath.AtName("namespace"), &namespace)...)
-	}
+	var meta generic.ObjectMeta
+	resp.Diagnostics.Append(generic.StateToObjectMeta(ctx, req.State, c.typeInfo, &meta)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	state, diags := generic.StateToValue(ctx, req.Plan, c.typeInfo)
-	resp.Diagnostics.Append(diags...)
+	var state types.KubernetesObjectValue
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("manifest"), &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -233,22 +214,21 @@ func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, 
 
 	// TODO: Validate that the object already exists. This will silently create
 	// the object if it does not already exist.
-	obj, err := c.typeInfo.Interface(c.client, namespace).Apply(ctx, name, obj, metav1.ApplyOptions{
-		FieldManager: fieldManager,
-		Force:        c.forceConflicts,
-	})
+	obj, err := c.typeInfo.Interface(c.client, meta.Namespace).
+		Apply(ctx, meta.Name, obj, metav1.ApplyOptions{FieldManager: fieldManager, Force: c.forceConflicts})
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to create resource", err.Error())
 		return
 	}
 
-	if importFieldManager != nil {
+	if importFieldManager != nil && *importFieldManager != fieldManager {
 		empty := unstructured.Unstructured{Object: map[string]interface{}{
 			"apiVersion": c.typeInfo.GroupVersionResource().GroupVersion().String(),
 			"kind":       c.typeInfo.Kind,
-			"metadata":   map[string]interface{}{"name": name, "namespace": namespace},
+			"metadata":   map[string]interface{}{"name": meta.Name, "namespace": meta.Namespace},
 		}}
-		_, err := c.typeInfo.Interface(c.client, namespace).Apply(ctx, name, &empty, metav1.ApplyOptions{FieldManager: *importFieldManager})
+		_, err := c.typeInfo.Interface(c.client, meta.Namespace).
+			Apply(ctx, meta.Name, &empty, metav1.ApplyOptions{FieldManager: *importFieldManager})
 		if err != nil {
 			resp.Diagnostics.AddError("Unable to remove imported fieldManager", err.Error())
 			return
@@ -261,15 +241,13 @@ func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, 
 	if diags.HasError() {
 		return
 	}
-	diags = state.ManagedFields(ctx, path.Empty(), fields, nil)
-	resp.Diagnostics.Append(diags...)
-	if diags.HasError() {
+	resp.Diagnostics.Append(state.ManagedFields(ctx, path.Empty(), fields, nil)...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	state, diags = generic.UnstructuredToValue(ctx, c.typeInfo.Schema, *obj, fields.Leaves())
-	resp.Diagnostics.Append(diags...)
-	if diags.HasError() {
+	resp.Diagnostics.Append(generic.UnstructuredToValue(ctx, c.typeInfo.Schema, *obj, fields.Leaves(), &state)...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("manifest"), state)...)
@@ -277,25 +255,22 @@ func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, 
 }
 
 func (c *crdResource) Delete(ctx context.Context, req tfresource.DeleteRequest, resp *tfresource.DeleteResponse) {
-	var name, namespace string
-	metadataPath := path.Root("manifest").AtName("metadata")
-	resp.Diagnostics.Append(req.State.GetAttribute(ctx, metadataPath.AtName("name"), &name)...)
-	if c.typeInfo.Namespaced {
-		resp.Diagnostics.Append(req.State.GetAttribute(ctx, metadataPath.AtName("namespace"), &namespace)...)
-	}
+	var meta generic.ObjectMeta
+	resp.Diagnostics.Append(generic.StateToObjectMeta(ctx, req.State, c.typeInfo, &meta)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	fieldSelector := fmt.Sprintf("metadata.name=%s", name)
-	w, err := c.client.Resource(c.typeInfo.GroupVersionResource()).Watch(ctx, metav1.ListOptions{FieldSelector: fieldSelector})
+	fieldSelector := fmt.Sprintf("metadata.name=%s", meta.Name)
+	w, err := c.client.Resource(c.typeInfo.GroupVersionResource()).
+		Watch(ctx, metav1.ListOptions{FieldSelector: fieldSelector})
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to watch resource for deletion", err.Error())
 		return
 	}
 	defer w.Stop()
 
-	err = c.typeInfo.Interface(c.client, namespace).Delete(ctx, name, metav1.DeleteOptions{})
+	err = c.typeInfo.Interface(c.client, meta.Namespace).Delete(ctx, meta.Name, metav1.DeleteOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		resp.Diagnostics.AddError("Unable to delete resource", err.Error())
 		return
@@ -318,26 +293,34 @@ func (c *crdResource) ImportState(ctx context.Context, req tfresource.ImportStat
 	fieldManagers := strings.Split(components[0], ",")
 	resource := components[1]
 
-	state, err := json.Marshal(fieldManagers)
+	fieldManagerState, err := json.Marshal(fieldManagers)
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to marshal fieldManagers", err.Error())
 		return
 	}
 
-	metadataPath := path.Root("manifest").AtName("metadata")
+	metadata := make(map[string]interface{})
 	if c.typeInfo.Namespaced {
 		components = strings.SplitN(resource, "/", 2)
 		if len(components) != 2 {
 			resp.Diagnostics.AddError("Invalid import ID", fmt.Sprintf("expected namespace/name resource, got %s", resource))
 			return
 		}
-		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, metadataPath.AtName("namespace"), components[0])...)
-		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, metadataPath.AtName("name"), components[1])...)
+		metadata["namespace"] = components[0]
+		metadata["name"] = components[1]
 	} else {
-		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, metadataPath.AtName("name"), resource)...)
+		metadata["name"] = resource
 	}
 
-	resp.Private.SetKey(ctx, "import-field-managers", state)
+	obj := unstructured.Unstructured{Object: map[string]interface{}{"metadata": metadata}}
+	var state types.KubernetesObjectValue
+	resp.Diagnostics.Append(generic.UnstructuredToValue(ctx, c.typeInfo.Schema, obj, nil, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("manifest"), state)...)
+	resp.Private.SetKey(ctx, "import-field-managers", fieldManagerState)
 }
 
 var (

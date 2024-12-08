@@ -3,8 +3,11 @@ package generic
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types"
 	runtimeschema "k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
@@ -36,33 +39,68 @@ func (t TypeInfo) Interface(client *dynamic.DynamicClient, namespace string) dyn
 	return resource
 }
 
-func OpenApiToTfSchema(ctx context.Context, customType types.KubernetesObjectType, isDatasSource bool) (schema.Attribute, error) {
-	attributes, err := customType.SchemaAttributes(ctx, types.SchemaOptions{IsDataSource: isDatasSource}, false)
+func OpenApiToTfSchema(ctx context.Context, typeInfo TypeInfo, isDatasSource bool) (schema.Attribute, error) {
+	schemaType := typeInfo.Schema
+
+	attr, err := schemaType.SchemaType(ctx, types.SchemaTypeOpts{IsDataSource: isDatasSource})
 	if err != nil {
 		return nil, err
 	}
 
-	meta, ok := attributes["metadata"].(schema.SingleNestedAttribute)
-	if !ok {
-		return nil, fmt.Errorf("expected object attribute at metadata")
-	}
-	meta.Computed = false
-	meta.Optional = false
-	meta.Required = true
-	for _, attrName := range []string{"name", "namespace"} {
-		attr, ok := meta.Attributes[attrName].(schema.StringAttribute)
-		if !ok {
-			if attrName == "namespace" {
-				continue
-			}
-			return nil, fmt.Errorf("expected string attribute at metadata.%s", attrName)
-		}
-		attr.Computed = false
-		attr.Optional = false
-		attr.Required = true
-		meta.Attributes[attrName] = attr
-	}
-	attributes["metadata"] = meta
+	dynamicAttr := attr.(schema.DynamicAttribute)
+	dynamicAttr.Validators = append(dynamicAttr.Validators, metadataValidator{isNamespaced: typeInfo.Namespaced})
 
-	return schema.SingleNestedAttribute{Attributes: attributes, Required: true}, nil
+	return dynamicAttr, err
+}
+
+type metadataValidator struct {
+	isNamespaced bool
+}
+
+func (v metadataValidator) Description(ctx context.Context) string {
+	return "Validate manifest metadata"
+}
+
+func (v metadataValidator) MarkdownDescription(ctx context.Context) string {
+	fields := []string{"metadata.name"}
+	if v.isNamespaced {
+		fields = append(fields, "metadata.namespace")
+	}
+	return fmt.Sprintf("Validate manifest metadata contains fields: %s", strings.Join(fields, ", "))
+}
+
+func (v metadataValidator) ValidateDynamic(ctx context.Context, req validator.DynamicRequest, resp *validator.DynamicResponse) {
+	if req.ConfigValue.IsUnknown() || req.ConfigValue.IsUnderlyingValueUnknown() {
+		return
+	}
+
+	underlying := req.ConfigValue.UnderlyingValue()
+	value, ok := underlying.(basetypes.ObjectValue)
+	if !ok {
+		resp.Diagnostics.AddAttributeError(req.Path, "Unexpected value type", fmt.Sprintf("Expected object, got %T", underlying))
+		return
+	}
+
+	metadataPath := req.Path.AtName("metadata")
+	metadataValue, found := value.Attributes()["metadata"]
+	if !found {
+		resp.Diagnostics.AddAttributeError(metadataPath, "Missing metadata value", "Manifest does not contain metadata")
+		return
+	}
+	metadata, ok := metadataValue.(types.KubernetesObjectValue)
+	if !ok {
+		resp.Diagnostics.AddAttributeError(metadataPath, "Unexpected value type", fmt.Sprintf("Expected object, got %T", underlying))
+		return
+	}
+
+	attributes := metadata.Attributes()
+
+	name := attributes["name"]
+	if name.IsNull() {
+		resp.Diagnostics.AddAttributeError(metadataPath.AtName("name"), "Missing attribute", "Manifest does not contain metadata.name")
+	}
+	namespace := attributes["namespace"]
+	if v.isNamespaced && namespace.IsNull() {
+		resp.Diagnostics.AddAttributeError(metadataPath.AtName("name"), "Missing attribute", "Manifest does not contain metadata.namespace")
+	}
 }

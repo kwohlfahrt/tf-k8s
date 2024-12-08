@@ -8,7 +8,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"k8s.io/kube-openapi/pkg/spec3"
@@ -20,15 +19,6 @@ type KubernetesUnionType struct {
 	basetypes.DynamicType
 
 	Members []attr.Type
-}
-
-func (t KubernetesUnionType) SchemaType(ctx context.Context, opts SchemaOptions, isRequired bool) (schema.Attribute, error) {
-	return schema.DynamicAttribute{
-		Required:   isRequired,
-		Optional:   !isRequired,
-		Computed:   false,
-		CustomType: t,
-	}, nil
 }
 
 func (t KubernetesUnionType) ValueFromUnstructured(
@@ -99,6 +89,11 @@ func (t KubernetesUnionType) ValueType(ctx context.Context) attr.Value {
 	return KubernetesUnionValue{
 		MemberTypes: t.Members,
 	}
+}
+
+func (t KubernetesUnionType) Validate(ctx context.Context, path path.Path, in attr.Value, isDataSource bool) diag.Diagnostics {
+	// TODO
+	return nil
 }
 
 var _ basetypes.DynamicTypable = KubernetesUnionType{}

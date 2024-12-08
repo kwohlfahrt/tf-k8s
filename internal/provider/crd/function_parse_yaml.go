@@ -46,10 +46,7 @@ func (f *ParseYAMLFunction) Definition(ctx context.Context, req function.Definit
 				// TODO: Figure out why I can't use CustomType: types.KubernetesUnknownValue
 			},
 		},
-		Return: function.ObjectReturn{
-			AttributeTypes: f.typeInfo.Schema.AttrTypes,
-			CustomType:     f.typeInfo.Schema,
-		},
+		Return: function.DynamicReturn{CustomType: f.typeInfo.Schema},
 	}
 }
 

@@ -2,7 +2,6 @@ package generic
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -11,23 +10,22 @@ import (
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
-func UnstructuredToValue(ctx context.Context, typ types.KubernetesObjectType, obj unstructured.Unstructured, fields *fieldpath.Set) (types.KubernetesValue, diag.Diagnostics) {
+func UnstructuredToValue(
+	ctx context.Context,
+	typ types.KubernetesObjectType,
+	obj unstructured.Unstructured,
+	fields *fieldpath.Set,
+	state *types.KubernetesObjectValue,
+) diag.Diagnostics {
 	var diags diag.Diagnostics
 
 	value, valueDiags := typ.ValueFromUnstructured(ctx, path.Empty(), fields, obj.UnstructuredContent())
 	diags.Append(valueDiags...)
 	if valueDiags.HasError() {
-		return nil, diags
+		return diags
 	}
-	kubernetesValue, ok := value.(*types.KubernetesObjectValue)
-	if !ok {
-		diags.AddError(
-			"Unexpected value type",
-			fmt.Sprintf("Expected KubernetesObjectValue, got %T. This is a provider-internal error.", value),
-		)
-	}
-
-	return kubernetesValue, diags
+	*state = value.(types.KubernetesObjectValue)
+	return diags
 }
 
 func ValueToUnstructured(ctx context.Context, objectValue types.KubernetesValue, typeInfo TypeInfo) (*unstructured.Unstructured, diag.Diagnostics) {
