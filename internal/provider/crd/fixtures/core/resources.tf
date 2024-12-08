@@ -16,6 +16,7 @@ resource "k8scrd_deployment_apps_v1" "bar" {
     }
     spec = {
       replicas = 0
+      min_ready_seconds = 0
       selector = { match_labels = { app = "bar" } }
       strategy = {
         type = "RollingUpdate"

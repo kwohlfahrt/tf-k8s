@@ -86,6 +86,11 @@ func primitiveFromUnstructured(ctx context.Context, path path.Path, typ attr.Typ
 		}
 		return typ.ValueFromString(ctx, basetypes.NewStringValue(stringVal))
 	case basetypes.Int64Typable:
+		if val == nil {
+			// Applies to at least apps/v1/Deployment.spec.minReadySeconds
+			// TODO: See if this applies to other fields, or if there is a more generic way to handle it
+			return typ.ValueFromInt64(ctx, basetypes.NewInt64Value(0))
+		}
 		intVal, ok := val.(int64)
 		if !ok {
 			return nil, []diag.Diagnostic{diag.NewAttributeErrorDiagnostic(
