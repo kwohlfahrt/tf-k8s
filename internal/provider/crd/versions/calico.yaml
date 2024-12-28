@@ -1,5 +1,6 @@
 apiGroups:
   - operator.tigera.io
   - crd.projectcalico.org
+  - projectcalico.org
 crdSources:
   - "https://raw.githubusercontent.com/projectcalico/calico/v3.28.2/manifests/operator-crds.yaml"
