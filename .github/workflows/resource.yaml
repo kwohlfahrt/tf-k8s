@@ -62,7 +62,7 @@ jobs:
             yq -0 ".extraResources[$i - 1].kustomization" < $VERSIONS \
               | xargs -0 -n1 kubectl apply --server-side --kustomize
             yq -0 ".extraResources[$i - 1].wait[]" < $VERSIONS \
-              | xargs -0 -n1 sh -c 'kubectl wait --for $@' '$0'
+              | xargs -0 -n1 sh -c 'kubectl wait --timeout=2m --for $@' '$0'
           done;
 
           kubectl apply --server-side -f internal/provider/crd/fixtures/${PROVIDER}/data.yaml
