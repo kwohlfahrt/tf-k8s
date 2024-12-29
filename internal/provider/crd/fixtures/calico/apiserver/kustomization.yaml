@@ -1,0 +1,7 @@
+resources:
+  - "https://raw.githubusercontent.com/projectcalico/calico/v3.28.2/manifests/apiserver.yaml"
+  - ./certificate.yaml
+
+patches:
+  - path: ./calico-apiserver.yaml
+  - path: ./apiservice.yaml
