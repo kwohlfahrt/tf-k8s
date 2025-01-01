@@ -86,6 +86,11 @@ jobs:
         run: |
           kubectl get -f internal/provider/crd/fixtures/${PROVIDER}/data.yaml -o yaml
 
+      - name: debug
+        if: matrix.provider == 'calico'
+        run: |
+          kubectl get ippools.projectcalico.org -o yaml
+
       - name: go test
         run: |
           go test -v $(go list -f '{{ join .Deps "\n" }}' ./cmd/provider | grep github.com/kwohlfahrt/terraform-provider-k8scrd)
