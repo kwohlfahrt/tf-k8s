@@ -53,11 +53,18 @@ jobs:
 
       - name: install fixtures
         run: |
-          if yq --exit-status '(.crdSources | length) > 0' < internal/provider/crd/versions/${PROVIDER}.yaml; then
-            yq -o json '.crdSources[]' < internal/provider/crd/versions/${PROVIDER}.yaml \
-              | xargs -I'{}' kubectl apply --server-side -o name --filename='{}' \
-              | xargs kubectl wait --for condition=established
-          fi
+          VERSIONS=internal/provider/crd/versions/${PROVIDER}.yaml
+          yq -0 '.crdSources[]' < $VERSIONS \
+            | xargs -0 -n1 kubectl apply --server-side -o name --filename \
+            | xargs --no-run-if-empty kubectl wait --for condition=established
+
+          for i in $(seq $(yq '.extraResources | length' < $VERSIONS )); do
+            yq -0 ".extraResources[$i - 1].kustomization" < $VERSIONS \
+              | xargs -0 -n1 kubectl apply --server-side --kustomize
+            yq -0 ".extraResources[$i - 1].wait[]" < $VERSIONS \
+              | xargs -0 -n1 sh -c 'kubectl wait --timeout=2m --for $@' '$0'
+          done;
+
           kubectl apply --server-side -f internal/provider/crd/fixtures/${PROVIDER}/data.yaml
 
       - name: configure provider
