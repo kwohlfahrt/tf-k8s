@@ -82,6 +82,10 @@ jobs:
           name: ${{ matrix.provider }}-typeInfos
           path: internal/provider/crd/typeInfos.bin
 
+      - name: check fixtures
+        run: |
+          kubectl get -f internal/provider/crd/fixtures/${PROVIDER}/data.yaml -o yaml
+
       - name: go test
         run: |
           go test -v $(go list -f '{{ join .Deps "\n" }}' ./cmd/provider | grep github.com/kwohlfahrt/terraform-provider-k8scrd)
