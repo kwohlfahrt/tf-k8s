@@ -86,10 +86,10 @@ jobs:
         run: |
           kubectl get -f internal/provider/crd/fixtures/${PROVIDER}/data.yaml -o yaml
 
-      - name: debug
-        if: matrix.provider == 'calico'
-        run: |
-          kubectl get ippools.projectcalico.org -o yaml
+      # - name: debug
+      #   if: matrix.provider == 'calico'
+      #   run: |
+      #     kubectl get ippools.projectcalico.org -o yaml
 
       - name: go test
         run: |

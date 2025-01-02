@@ -1,13 +1,13 @@
 apiGroups:
   - operator.tigera.io
   - crd.projectcalico.org
-  - projectcalico.org
+  # - projectcalico.org
 crdSources:
   - "https://raw.githubusercontent.com/projectcalico/calico/v3.28.2/manifests/operator-crds.yaml"
-extraResources:
-  - kustomization: internal/provider/crd/fixtures/calico/cert-manager
-    wait:
-      - condition=available --namespace cert-manager deployment.apps/cert-manager-webhook deployment.apps/cert-manager-cainjector
-  - kustomization: internal/provider/crd/fixtures/calico/apiserver
-    wait:
-      - condition=available apiservices.apiregistration.k8s.io/v3.projectcalico.org
+# extraResources:
+#   - kustomization: internal/provider/crd/fixtures/calico/cert-manager
+#     wait:
+#       - condition=available --namespace cert-manager deployment.apps/cert-manager-webhook deployment.apps/cert-manager-cainjector
+#   - kustomization: internal/provider/crd/fixtures/calico/apiserver
+#     wait:
+#       - condition=available apiservices.apiregistration.k8s.io/v3.projectcalico.org
