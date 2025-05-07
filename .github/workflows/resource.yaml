@@ -82,14 +82,10 @@ jobs:
           name: ${{ matrix.provider }}-typeInfos
           path: internal/provider/crd/typeInfos.bin
 
+      # This works around flakiness in the Calico tests
       - name: check fixtures
         run: |
           kubectl get -f internal/provider/crd/fixtures/${PROVIDER}/data.yaml -o yaml
-
-      # - name: debug
-      #   if: matrix.provider == 'calico'
-      #   run: |
-      #     kubectl get ippools.projectcalico.org -o yaml
 
       - name: go test
         run: |
