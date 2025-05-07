@@ -62,3 +62,11 @@ resource "k8scrd_clusterrole_rbac_authorization_k8s_io_v1" "bar" {
     ]
   }
 }
+
+resource "k8scrd_priorityclass_scheduling_k8s_io_v1" "bar" {
+  manifest = {
+    metadata = { name = "bar" }
+    preemption_policy = "Never"
+    value = -1
+  }
+}
