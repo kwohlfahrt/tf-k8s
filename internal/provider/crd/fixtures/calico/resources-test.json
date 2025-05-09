@@ -1,16 +1,16 @@
 {
     "Properties": [
         {
-            "Name": "k8scrd_ippool_crd_projectcalico_org_v1.bar",
+            "Name": "k8scrd_ippool_projectcalico_org_v3.bar",
             "Path": ["manifest", "spec", "cidr"],
-            "Value": "198.51.100.8/30"
+            "Value": "203.0.113.0/24"
         }
     ],
     "Resources": [
         {
             "GroupVersionResource": {
-                "group": "crd.projectcalico.org",
-                "version": "v1",
+                "group": "projectcalico.org",
+                "version": "v3",
                 "resource": "ippools"
             },
             "Metadata": {
