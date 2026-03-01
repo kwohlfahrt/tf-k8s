@@ -7,8 +7,11 @@ apiGroups:
   - networking.k8s.io
   - admissionregistration.k8s.io
   - scheduling.k8s.io
+  # Not technically core, but I think it makes sense to have all *.k8s.io in this provider
+  - gateway.networking.k8s.io
+crdSources:
+  - https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.0/standard-install.yaml
 defaults:
   io.k8s.api.core.v1.ObjectFieldSelector:
     property: apiVersion
     value: "v1"
-crdSources: []
