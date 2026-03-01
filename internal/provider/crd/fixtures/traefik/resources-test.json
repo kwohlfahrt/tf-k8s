@@ -1,0 +1,22 @@
+{
+    "Properties": [
+        {
+            "Name": "k8scrd_middleware_traefik_io_v1alpha1.baz",
+            "Path": ["manifest", "spec", "forward_auth", "address"],
+            "Value": "http://baz.example.com/auth"
+        }
+    ],
+    "Resources": [
+        {
+            "GroupVersionResource": {
+                "group": "traefik.io",
+                "version": "v1alpha1",
+                "resource": "middlewares"
+            },
+            "Metadata": {
+                "name": "baz",
+                "namespace": "default"
+            }
+        }
+    ]
+}

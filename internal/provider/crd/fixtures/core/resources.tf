@@ -70,3 +70,10 @@ resource "k8scrd_priorityclass_scheduling_k8s_io_v1" "bar" {
     value = -1
   }
 }
+
+resource "k8scrd_gatewayclass_gateway_networking_k8s_io_v1" "bar" {
+  manifest = {
+    metadata = { name = "bar" }
+    spec = { controller_name = "example.com/foo" }
+  }
+}

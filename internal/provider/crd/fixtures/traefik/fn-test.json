@@ -1,0 +1,9 @@
+{
+    "Outputs": [
+        {
+            "Name": "foo",
+            "Path": ["spec", "forward_auth", "address"],
+            "Value": "http://example.com/auth"
+        }
+    ]
+}
