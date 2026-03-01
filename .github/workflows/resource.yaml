@@ -44,7 +44,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version: '1.26'
 
       - name: create kind cluster
         run: |
@@ -56,6 +56,7 @@ jobs:
           VERSIONS=internal/provider/crd/versions/${PROVIDER}.yaml
           yq -0 '.crdSources[]' < $VERSIONS \
             | xargs -0 -n1 kubectl apply --server-side -o name --filename \
+            | grep 'customresourcedefinition.apiextensions.k8s.io/' \
             | xargs --no-run-if-empty kubectl wait --for condition=established
 
           for i in $(seq $(yq '.extraResources | length' < $VERSIONS )); do
@@ -106,7 +107,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version: '1.26'
 
       - name: download generated code
         uses: actions/download-artifact@v4

@@ -1,0 +1,22 @@
+{
+    "Properties": [
+        {
+            "Name": "k8scrd_middleware_traefik_io_v1alpha1.bar",
+            "Path": ["manifest", "spec", "forward_auth", "address"],
+            "Value": "http://bar.example.com/auth"
+        }
+    ],
+    "Resources": [
+        {
+            "GroupVersionResource": {
+                "group": "traefik.io",
+                "version": "v1alpha1",
+                "resource": "middlewares"
+            },
+            "Metadata": {
+                "name": "bar",
+                "namespace": "default"
+            }
+        }
+    ]
+}

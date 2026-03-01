@@ -1,0 +1,15 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: foo
+spec:
+  forwardAuth:
+    address: http://foo.example.com/auth
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: bar
+spec:
+  forwardAuth:
+    address: http://bar.example.com/auth

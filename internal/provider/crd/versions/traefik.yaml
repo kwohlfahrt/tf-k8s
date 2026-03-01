@@ -1,0 +1,4 @@
+apiGroups:
+  - traefik.io
+crdSources:
+  - https://raw.githubusercontent.com/traefik/traefik/v3.6/docs/content/reference/dynamic-configuration/kubernetes-crd-definition-v1.yml

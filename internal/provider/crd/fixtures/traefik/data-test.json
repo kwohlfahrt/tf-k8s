@@ -1,0 +1,9 @@
+{
+    "Properties": [
+        {
+            "Name": "data.k8scrd_middleware_traefik_io_v1alpha1.foo",
+            "Path": ["manifest", "spec", "forward_auth", "address"],
+            "Value": "http://foo.example.com/auth"
+        }
+    ]
+}
