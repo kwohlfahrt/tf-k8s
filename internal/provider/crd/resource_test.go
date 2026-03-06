@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
@@ -48,6 +49,13 @@ func TestAccResource(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: map[string]func() (tfprotov6.ProviderServer, error){
 			"k8scrd": providerserver.NewProtocol6WithError(providerFactory()),
+		},
+		PreCheck: func() {
+			dataPath := fmt.Sprintf("./fixtures/%s/data.yaml", os.Getenv("PROVIDER"))
+			cmd := exec.Command("kubectl", "apply", "--server-side", "-f", dataPath)
+			if err := cmd.Run(); err != nil {
+				t.Fatal(err)
+			}
 		},
 		Steps: []resource.TestStep{
 			{
