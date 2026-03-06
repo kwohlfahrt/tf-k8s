@@ -9,6 +9,11 @@
             "Name": "k8scrd_bar_example_com_v1.bar",
             "Path": ["manifest", "spec", "bar"],
             "Value": "bar"
+        },
+        {
+            "Name": "k8scrd_foo_example_com_v1.baz",
+            "Path": ["manifest", "spec", "foo"],
+            "Value": "baz"
         }
     ],
     "Resources": [
@@ -31,6 +36,17 @@
             },
             "Metadata": {
                 "name": "bar",
+                "namespace": "default"
+            }
+        },
+        {
+            "GroupVersionResource": {
+                "group": "example.com",
+                "version": "v1",
+                "resource": "foos"
+            },
+            "Metadata": {
+                "name": "baz",
                 "namespace": "default"
             }
         }

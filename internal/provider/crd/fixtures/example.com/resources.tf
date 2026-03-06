@@ -20,3 +20,15 @@ resource "k8scrd_bar_example_com_v1" "bar" {
     spec     = { bar = "bar" }
   }
 }
+
+resource "k8scrd_foo_example_com_v1" "baz" {
+  manifest = {
+    metadata = { name = "baz", namespace = "default" }
+    spec     = { foo = "baz" }
+  }
+}
+
+import {
+  to = k8scrd_foo_example_com_v1.baz
+  id = "kubectl:default/baz"
+}
