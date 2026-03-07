@@ -54,6 +54,13 @@ func TestAccResource(t *testing.T) {
 			Check:            makeChecks(k, checkSpeck.Resources),
 			ConfigPlanChecks: makeConfigChecks(checkSpeck.Properties, checkSpeck.Outputs),
 		},
+		{
+			Config: string(cfg),
+			ConfigVariables: config.Variables{
+				"kubeconfig": config.StringVariable(string(kubeconfig)),
+				"update":     config.BoolVariable(true),
+			},
+		},
 	}
 
 	failCfg, err := os.ReadFile(fmt.Sprintf("./fixtures/%s/fail.tf", os.Getenv("PROVIDER")))
