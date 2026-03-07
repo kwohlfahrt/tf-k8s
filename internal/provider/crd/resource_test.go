@@ -72,7 +72,7 @@ func TestAccResource(t *testing.T) {
 		steps = append(steps, resource.TestStep{
 			Config:          string(failCfg),
 			ConfigVariables: config.Variables{"kubeconfig": config.StringVariable(string(kubeconfig))},
-			ExpectError:     regexp.MustCompile("metadata.resourceVersion"),
+			ExpectError:     regexp.MustCompile("already exists"),
 		})
 	}
 
