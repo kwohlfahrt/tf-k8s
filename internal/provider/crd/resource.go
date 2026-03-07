@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/util/csaupgrade"
+	"k8s.io/client-go/util/retry"
 )
 
 type crdResource struct {
@@ -113,6 +114,37 @@ func (c *crdResource) Create(ctx context.Context, req tfresource.CreateRequest, 
 		return
 	}
 
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		// We have created the object, so all fields are owned by `fieldManager`,
+		// but with `operation: Update`. This produces a conflict when we try to
+		// server-side apply changes in `Update()`. Use `csaupgrade` to migrate the
+		// field manager to `operation: Apply`. This might be better in `Update()`.
+		patchData, err := csaupgrade.UpgradeManagedFieldsPatch(obj, sets.New(fieldManager), fieldManager)
+		if err != nil {
+			return err
+		}
+
+		obj, err = iface.Patch(ctx, meta.Name, k8stypes.JSONPatchType, patchData, metav1.PatchOptions{})
+		if err != nil && errors.IsConflict(err) {
+			newObj, getErr := iface.Get(ctx, meta.Name, metav1.GetOptions{})
+			if getErr != nil {
+				return getErr
+			}
+			obj = newObj
+		}
+		return err
+	})
+	if err != nil {
+		resp.Diagnostics.AddError("Unable to patch field-manager", err.Error())
+		return
+	}
+
+	// Apply to update the list of tracked fields to match `planObj`, not the entire object creation.
+	obj, err = iface.Apply(ctx, meta.Name, planObj, metav1.ApplyOptions{FieldManager: fieldManager})
+	if err != nil {
+		resp.Diagnostics.AddError("Unable to update resource", err.Error())
+	}
+
 	fields, diags := generic.GetManagedFieldSet(obj, fieldManager)
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
@@ -129,21 +161,6 @@ func (c *crdResource) Create(ctx context.Context, req tfresource.CreateRequest, 
 
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("manifest"), state)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("field_manager"), fieldManager)...)
-
-	// We have created the object, so all fields are owned by `fieldManager`,
-	// but with `operation: Update`. This produces a conflict when we try to
-	// server-side apply changes in `Update()`. Use `csaupgrade` to migrate the
-	// field manager to `operation: Apply`. This might be better in `Update()`.
-	patchData, err := csaupgrade.UpgradeManagedFieldsPatch(obj, sets.New(fieldManager), fieldManager)
-	if err != nil {
-		resp.Diagnostics.AddError("Unable to construct field-manager patch", err.Error())
-		return
-	}
-
-	_, err = iface.Patch(ctx, meta.Name, k8stypes.JSONPatchType, patchData, metav1.PatchOptions{})
-	if err != nil {
-		resp.Diagnostics.AddError("Unable to patch field-manager", err.Error())
-	}
 }
 
 func (c *crdResource) Read(ctx context.Context, req tfresource.ReadRequest, resp *tfresource.ReadResponse) {
@@ -235,7 +252,7 @@ func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, 
 	obj, err := c.typeInfo.Interface(c.client, meta.Namespace).
 		Apply(ctx, meta.Name, obj, metav1.ApplyOptions{FieldManager: fieldManager, Force: c.forceConflicts})
 	if err != nil {
-		resp.Diagnostics.AddError("Unable to create resource", err.Error())
+		resp.Diagnostics.AddError("Unable to update resource", err.Error())
 		return
 	}
 
