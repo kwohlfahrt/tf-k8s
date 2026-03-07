@@ -92,9 +92,9 @@
         },
         {
             "GroupVersionResource": {
-                "group": "",
+                "group": "rbac.authorization.k8s.io",
                 "version": "v1",
-                "resource": "namespaces"
+                "resource": "clusterrolebindings"
             },
             "Metadata": {
                 "name": "baz"

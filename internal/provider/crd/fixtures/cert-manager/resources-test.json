@@ -27,7 +27,7 @@
             "GroupVersionResource": {
                 "group": "cert-manager.io",
                 "version": "v1",
-                "resource": "certificate"
+                "resource": "certificates"
             },
             "Metadata": {
                 "name": "baz",
