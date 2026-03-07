@@ -66,8 +66,6 @@ jobs:
               | xargs -0 -n1 sh -c 'kubectl wait --timeout=2m --for $@' '$0'
           done;
 
-          kubectl apply --server-side -f internal/provider/crd/fixtures/${PROVIDER}/data.yaml
-
       - name: configure provider
         run: |
           sed -i -e "1 {s|example\\.com\\.yaml$|${PROVIDER}.yaml|; t; q1}" internal/provider/crd/crd.go

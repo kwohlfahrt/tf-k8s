@@ -7,16 +7,21 @@ provider "k8scrd" {
   kubeconfig = var.kubeconfig
 }
 
-resource "k8scrd_ippool_crd_projectcalico_org_v1" "bar" {
+resource "k8scrd_ippool_projectcalico_org_v3" "bar" {
   manifest = {
     metadata = { name = "bar" }
-    spec     = { cidr = "198.51.100.8/30" }
+    spec     = { cidr = "198.51.100.128/26" }
   }
 }
 
-resource "k8scrd_ippool_projectcalico_org_v3" "bar" {
+resource "k8scrd_ippool_projectcalico_org_v3" "baz" {
   manifest = {
-    metadata = { name = "qux" }
-    spec     = { cidr = "192.0.2.0/24" }
+    metadata = { name = "baz" }
+    spec     = { cidr = "198.51.100.64/26", nat_outgoing = true }
   }
+}
+
+import {
+  to = k8scrd_ippool_projectcalico_org_v3.baz
+  id = "kubectl:baz"
 }
