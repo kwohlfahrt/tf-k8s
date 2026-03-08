@@ -15,8 +15,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	k8stypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/util/csaupgrade"
+	"k8s.io/client-go/util/retry"
 )
 
 type crdResource struct {
@@ -99,15 +103,46 @@ func (c *crdResource) Create(ctx context.Context, req tfresource.CreateRequest, 
 		return
 	}
 
-	// TODO: Validate that we haven't previously created the object. It will
-	// conflict fail if it was created by a different tool, but if we created it
-	// and forgot, this will silently adopt the object. We could generate a
-	// unique `FieldManager` ID per resource, and persist it in the TF state.
-	obj, err := c.typeInfo.Interface(c.client, meta.Namespace).
-		Apply(ctx, meta.Name, planObj, metav1.ApplyOptions{FieldManager: fieldManager})
+	iface := c.typeInfo.Interface(c.client, meta.Namespace)
+	// Use a `Create` operation, to ensure we are creating the resource.  This
+	// ensures two terraform operations can't both create the same object. See
+	// also github.com/kubernetes/kubernetes#116156
+	obj, err := iface.
+		Create(ctx, planObj, metav1.CreateOptions{FieldManager: fieldManager})
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to create resource", err.Error())
 		return
+	}
+
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		// We have created the object, so all fields are owned by `fieldManager`,
+		// but with `operation: Update`. This produces a conflict when we try to
+		// server-side apply changes in `Update()`. Use `csaupgrade` to migrate the
+		// field manager to `operation: Apply`. This might be better in `Update()`.
+		patchData, err := csaupgrade.UpgradeManagedFieldsPatch(obj, sets.New(fieldManager), fieldManager)
+		if err != nil {
+			return err
+		}
+
+		obj, err = iface.Patch(ctx, meta.Name, k8stypes.JSONPatchType, patchData, metav1.PatchOptions{})
+		if err != nil && errors.IsConflict(err) {
+			newObj, getErr := iface.Get(ctx, meta.Name, metav1.GetOptions{})
+			if getErr != nil {
+				return getErr
+			}
+			obj = newObj
+		}
+		return err
+	})
+	if err != nil {
+		resp.Diagnostics.AddError("Unable to patch field-manager", err.Error())
+		return
+	}
+
+	// Apply to update the list of tracked fields to match `planObj`, not the entire object creation.
+	obj, err = iface.Apply(ctx, meta.Name, planObj, metav1.ApplyOptions{FieldManager: fieldManager})
+	if err != nil {
+		resp.Diagnostics.AddError("Unable to update resource", err.Error())
 	}
 
 	fields, diags := generic.GetManagedFieldSet(obj, fieldManager)
@@ -217,7 +252,7 @@ func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, 
 	obj, err := c.typeInfo.Interface(c.client, meta.Namespace).
 		Apply(ctx, meta.Name, obj, metav1.ApplyOptions{FieldManager: fieldManager, Force: c.forceConflicts})
 	if err != nil {
-		resp.Diagnostics.AddError("Unable to create resource", err.Error())
+		resp.Diagnostics.AddError("Unable to update resource", err.Error())
 		return
 	}
 

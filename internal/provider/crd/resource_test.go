@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
@@ -46,6 +47,35 @@ func TestAccResource(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	steps := []resource.TestStep{
+		{
+			Config:           string(cfg),
+			ConfigVariables:  config.Variables{"kubeconfig": config.StringVariable(string(kubeconfig))},
+			Check:            makeChecks(k, checkSpeck.Resources),
+			ConfigPlanChecks: makeConfigChecks(checkSpeck.Properties, checkSpeck.Outputs),
+		},
+		{
+			Config: string(cfg),
+			ConfigVariables: config.Variables{
+				"kubeconfig": config.StringVariable(string(kubeconfig)),
+				"update":     config.BoolVariable(true),
+			},
+		},
+	}
+
+	failCfg, err := os.ReadFile(fmt.Sprintf("./fixtures/%s/fail.tf", os.Getenv("PROVIDER")))
+	if err != nil {
+		if !os.IsNotExist(err) {
+			t.Fatal(err)
+		}
+	} else {
+		steps = append(steps, resource.TestStep{
+			Config:          string(failCfg),
+			ConfigVariables: config.Variables{"kubeconfig": config.StringVariable(string(kubeconfig))},
+			ExpectError:     regexp.MustCompile("already exists"),
+		})
+	}
+
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: map[string]func() (tfprotov6.ProviderServer, error){
 			"k8scrd": providerserver.NewProtocol6WithError(providerFactory()),
@@ -57,14 +87,7 @@ func TestAccResource(t *testing.T) {
 				t.Fatal(err)
 			}
 		},
-		Steps: []resource.TestStep{
-			{
-				Config:           string(cfg),
-				ConfigVariables:  config.Variables{"kubeconfig": config.StringVariable(string(kubeconfig))},
-				Check:            makeChecks(k, checkSpeck.Resources),
-				ConfigPlanChecks: makeConfigChecks(checkSpeck.Properties, checkSpeck.Outputs),
-			},
-		},
+		Steps:        steps,
 		CheckDestroy: makeDestroyChecks(k, checkSpeck.Resources),
 	})
 }

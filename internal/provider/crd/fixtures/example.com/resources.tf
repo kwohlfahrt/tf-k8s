@@ -3,6 +3,11 @@ variable "kubeconfig" {
   sensitive = true
 }
 
+variable "update" {
+  type    = bool
+  default = false
+}
+
 provider "k8scrd" {
   kubeconfig = var.kubeconfig
 }
@@ -17,7 +22,7 @@ resource "k8scrd_foo_example_com_v1" "bar" {
 resource "k8scrd_bar_example_com_v1" "bar" {
   manifest = {
     metadata = { name = "bar", namespace = "default" }
-    spec     = { bar = "bar" }
+    spec     = { bar = var.update ? "barbar" : "bar" }
   }
 }
 
