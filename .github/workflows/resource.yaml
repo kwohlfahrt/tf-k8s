@@ -15,12 +15,18 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       providers: ${{ steps.list-providers.outputs.keys || steps.tag-provider.outputs.keys }}
+      version: ${{ steps.tag-provider.outputs.version || '0.0.1' }}
+      os: ${{ steps.list-providers.outputs.os || steps.tag-provider.outputs.os }}
+      arch: ${{ steps.list-providers.outputs.arch || steps.tag-provider.outputs.arch }}
     steps:
       - uses: actions/checkout@v4
       - id: tag-provider
         if: startswith(github.event.ref, 'refs/tags/')
         run: |
-          echo "${{ github.ref_name }}" | sed -nr 's/^resource-([a-z]+)-v[0-9].*$/keys=["\1"]/p; t; q1' >> $GITHUB_OUTPUT
+          echo "${{ github.ref_name }}" \
+            | sed -nr 's/^resource-([a-z]+)-v([0-9].*)$/keys=["\1"]\nversion=\2/p; t; q1' >> $GITHUB_OUTPUT
+          echo 'os=["darwin", "linux", "windows"]' >> $GITHUB_OUTPUT
+          echo 'arch=["amd64", "arm64", "riscv64"]' >> $GITHUB_OUTPUT
       - id: list-providers
         if: ${{ !startswith(github.event.ref, 'refs/tags/') }}
         run: |
@@ -29,6 +35,9 @@ jobs:
             | xargs -I{} basename {} .yaml \
             | jq --null-input --raw-input '[inputs]' >> $GITHUB_OUTPUT
           echo 'EOF' >> $GITHUB_OUTPUT
+
+          echo 'os=["linux"]' >> $GITHUB_OUTPUT
+          echo 'arch=["amd64"]' >> $GITHUB_OUTPUT
 
   test:
     runs-on: ubuntu-latest
@@ -86,21 +95,21 @@ jobs:
           go test -v $(go list -f '{{ join .Deps "\n" }}' ./cmd/provider | grep github.com/kwohlfahrt/terraform-provider-k8scrd)
 
   build:
-    if: startswith(github.event.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     needs: [get-providers, test]
     strategy:
       matrix:
         provider: ${{ fromJson(needs.get-providers.outputs.providers) }}
-        os: ["darwin", "linux", "windows"]
-        arch: ["amd64", "arm64", "riscv64"]
+        os: ${{ fromJson(needs.get-providers.outputs.os) }}
+        arch: ${{ fromJson(needs.get-providers.outputs.arch) }}
         exclude:
-          - os: darwin
-            arch: riscv64
-          - os: windows
-            arch: riscv64
+          - { os: darwin, arch: riscv64 }
+          - { os: windows, arch: riscv64 }
     env:
         PROVIDER: ${{ matrix.provider }}
+        VERSION: ${{ needs.get-providers.outputs.version }}
+        GOOS: ${{ matrix.os }}
+        GOARCH: ${{ matrix.arch }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -116,36 +125,38 @@ jobs:
       - name: go build
         id: build
         run: |
-          export GOOS=${{ matrix.os }}
-          export GOARCH=${{ matrix.arch }}
-          PROVIDER_NAME=terraform-provider-k8s-${PROVIDER}_${GOOS}_${GOARCH}
-          echo provider-name=$PROVIDER_NAME >> $GITHUB_OUTPUT
+          PROVIDER_NAME=terraform-provider-k8s-${PROVIDER}_v${VERSION}
           go build -o $PROVIDER_NAME ./cmd/provider
+
+          ZIP_NAME=terraform-provider-k8s-${PROVIDER}_${VERSION}_${GOOS}_${GOARCH}.zip
+          echo zip-name=${ZIP_NAME} >> $GITHUB_OUTPUT
+          zip ${ZIP_NAME} $PROVIDER_NAME
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.build.outputs.provider-name }}
-          path: ${{ steps.build.outputs.provider-name }}
+          name: ${{ steps.build.outputs.zip-name }}
+          path: ${{ steps.build.outputs.zip-name }}
 
   publish:
-    if: startswith(github.event.ref, 'refs/tags/')
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [get-providers, build]
     permissions:
       contents: write
+    strategy:
+      matrix:
+        provider: ${{ fromJson(needs.get-providers.outputs.providers) }}
+    env:
+        VERSION: ${{ needs.get-providers.outputs.version }}
     steps:
-      - name: parse tag
-        id: meta
-        run: |
-          echo "${{ github.ref_name }}" \
-            | sed -nr 's/^resource-([a-z]+)-(v[0-9].*)$/name=\1\nversion=\2/p; t; q1' >> $GITHUB_OUTPUT
       - uses: actions/download-artifact@v4
         with:
+          pattern: terraform-provider-k8s-${{ matrix.provider }}_${{ env.VERSION }}_*
           merge-multiple: true
       - uses: softprops/action-gh-release@v2
+        if: startswith(github.event.ref, 'refs/tags/')
         with:
-          name: ${{ steps.meta.outputs.name }} ${{ steps.meta.outputs.version }}
+          name: ${{ matrix.provider }} ${{ env.VERSION }}
           draft: true
           fail_on_unmatched_files: true
           files: |
-            terraform-provider-k8s-*
+            terraform-provider-k8s-*.zip
