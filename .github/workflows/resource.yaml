@@ -150,8 +150,15 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          pattern: terraform-provider-k8s-${{ matrix.provider }}_${{ env.VERSION }}_*
+          pattern: terraform-provider-k8s-${{ matrix.provider }}_*
           merge-multiple: true
+      - name: generate version.json
+        run: |
+          ls *.zip \
+            | sed -r 's/terraform-provider-k8s-[a-z-]+_[0-9.]+_([a-z]+)_([a-z0-9]+).zip/{"os": "\1", "arch": "\2"}/' \
+            | jq --slurp '{"version": $ENV.VERSION, "protocols": ["6.0"], "platforms": .}' \
+            > version.json
+      - run: shasums -a 256 terraform-provider-k8s-*.zip > SHA256SUMS
       - uses: softprops/action-gh-release@v2
         if: startswith(github.event.ref, 'refs/tags/')
         with:
@@ -160,3 +167,5 @@ jobs:
           fail_on_unmatched_files: true
           files: |
             terraform-provider-k8s-*.zip
+            SHA256SUMS
+            version.json
