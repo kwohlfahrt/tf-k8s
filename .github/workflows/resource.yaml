@@ -47,18 +47,18 @@ jobs:
       matrix:
         provider: ${{ fromJson(needs.get-providers.outputs.providers) }}
     env:
-        TF_ACC: "1"
-        PROVIDER: ${{ matrix.provider }}
+      TF_ACC: "1"
+      PROVIDER: ${{ matrix.provider }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.26'
+          go-version: "1.26"
 
       - name: create kind cluster
         run: |
-            kind create cluster --kubeconfig=./kubeconfig.yaml
-            echo KUBECONFIG=$(pwd)/kubeconfig.yaml >> "$GITHUB_ENV"
+          kind create cluster --kubeconfig=./kubeconfig.yaml
+          echo KUBECONFIG=$(pwd)/kubeconfig.yaml >> "$GITHUB_ENV"
 
       - name: install fixtures
         run: |
@@ -106,15 +106,15 @@ jobs:
           - { os: darwin, arch: riscv64 }
           - { os: windows, arch: riscv64 }
     env:
-        PROVIDER: ${{ matrix.provider }}
-        VERSION: ${{ needs.get-providers.outputs.version }}
-        GOOS: ${{ matrix.os }}
-        GOARCH: ${{ matrix.arch }}
+      PROVIDER: ${{ matrix.provider }}
+      VERSION: ${{ needs.get-providers.outputs.version }}
+      GOOS: ${{ matrix.os }}
+      GOARCH: ${{ matrix.arch }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.26'
+          go-version: "1.26"
 
       - name: download generated code
         uses: actions/download-artifact@v4
@@ -146,7 +146,7 @@ jobs:
       matrix:
         provider: ${{ fromJson(needs.get-providers.outputs.providers) }}
     env:
-        VERSION: ${{ needs.get-providers.outputs.version }}
+      VERSION: ${{ needs.get-providers.outputs.version }}
     steps:
       - uses: actions/download-artifact@v4
         with:
