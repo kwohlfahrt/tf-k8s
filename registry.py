@@ -7,8 +7,10 @@
 # ///
 
 import asyncio
+from collections import defaultdict
 from collections.abc import AsyncIterator
-from dataclasses import dataclass
+import dataclasses
+from itertools import chain
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -24,8 +26,13 @@ class Gpg:
     def __init__(self, key_name: str, dir: Path):
         self.key_name = key_name
         self.dir = dir
+        self._armor = None
+        self._key_id = None
 
     async def armor(self) -> str:
+        if self._armor is not None:
+            return self._armor
+
         proc = await asyncio.create_subprocess_exec(
             "gpg",
             f"--homedir={self.dir}",
@@ -36,9 +43,14 @@ class Gpg:
         )
         stdout, _ = await proc.communicate()
         assert proc.returncode == 0
-        return stdout.decode()
+
+        self._armor = stdout.decode()
+        return self._armor
 
     async def key_id(self) -> str:
+        if self._key_id is not None:
+            return self._key_id
+
         proc = await asyncio.create_subprocess_exec(
             "gpg",
             f"--homedir={self.dir}",
@@ -53,7 +65,22 @@ class Gpg:
         for line in stdout.decode().splitlines():
             parts = line.split(":")
             if parts[0] == "pub":
-                return parts[4]
+                self._key_id = parts[4]
+                return self._key_id
+
+    async def sign(self, file: Path):
+        proc = await asyncio.create_subprocess_exec(
+            "gpg",
+            f"--homedir={self.dir}",
+            "--batch",
+            "--passphrase=",
+            "--local-user",
+            self.key_name,
+            "--detach-sign",
+            str(file),
+        )
+        await proc.wait()
+        assert proc.returncode == 0
 
     @classmethod
     async def new(cls, key_name: str, dir: Path):
@@ -73,27 +100,49 @@ class Gpg:
         return cls(key_name, dir)
 
 
-@dataclass
+@dataclasses.dataclass
 class Platform:
     os: str
     arch: str
 
 
-@dataclass
+@dataclasses.dataclass
 class Release:
     provider: str
     version: str
     protocols: list[str]
     platforms: list[Platform]
     assets: dict[str, str]
-    file_hashes: dict[str, str]
+    shasums: str
 
-    async def write_files(self, base: Path, gpg: tuple[str, str]):
-        download = base / self.provider / self.version / "download"
+    @property
+    def version_doc(self):
+        return {
+            "version": self.version,
+            "protocols": self.protocols,
+            "platforms": list(map(dataclasses.asdict, self.platforms)),
+        }
+
+    async def write_files(self, base: Path, gpg: Gpg):
+        download = Path(self.provider) / self.version / "download"
+        (base / download).mkdir(exist_ok=True, parents=True)
+
+        with TemporaryDirectory() as d:
+            shasums = Path(d) / "SHA256SUMS"
+            shasums.write_text(self.shasums)
+            await gpg.sign(shasums)
+            shasums.with_suffix(".sig").rename(base / download / "SHA256SUMS.sig")
+
+        shasums_url = f"https://{user}.github.io/{repo}/registry/providers/v1/{download}/SHA256SUMS.sig"
+        file_hashes = {
+            filename: shasum
+            for shasum, filename in map(str.split, self.shasums.splitlines())
+        }
+
         for platform in self.platforms:
-            path = download / platform.os / platform.arch
+            path = base / download / platform.os / platform.arch
             path.parent.mkdir(parents=True, exist_ok=True)
-            filename = "terraform-provider-k8s-{self.provider}_{self.version}_{platform.os}_{platform.arch}.zip"
+            filename = f"terraform-provider-k8s-{self.provider}_{self.version}_{platform.os}_{platform.arch}.zip"
             path.write_text(
                 json.dumps(
                     {
@@ -102,12 +151,15 @@ class Release:
                         "arch": platform.arch,
                         "filename": filename,
                         "download_url": self.assets[filename],
-                        "shasums_url": self.assets["SHA2556SUMS"],
-                        "shasums_signature_url": "",
-                        "shasum": self.file_hashes[filename],
+                        "shasums_url": self.assets["SHA256SUMS"],
+                        "shasums_signature_url": shasums_url,
+                        "shasum": file_hashes[filename],
                         "signing_keys": {
                             "gpg_public_keys": [
-                                {"key_id": gpg[0], "ascii_armor": gpg[1]}
+                                {
+                                    "key_id": await gpg.key_id(),
+                                    "ascii_armor": await gpg.armor(),
+                                }
                             ]
                         },
                     }
@@ -120,16 +172,11 @@ class Release:
         assets = {a["name"]: a["browser_download_url"] for a in json["assets"]}
         async with sess.get(assets["version.json"]) as r:
             r.raise_for_status()
-            version = await r.json()
+            version = await r.json(content_type="application/octet-stream")
 
         async with sess.get(assets["SHA256SUMS"]) as r:
             r.raise_for_status()
             shasums = await r.text()
-
-        file_hashes = {
-            filename: shasum
-            for shasum, filename in map(str.split, shasums.splitlines())
-        }
 
         return cls(
             provider=provider,
@@ -137,7 +184,7 @@ class Release:
             protocols=version["protocols"],
             platforms=[Platform(**p) for p in version["platforms"]],
             assets=assets,
-            file_hashes=file_hashes,
+            shasums=shasums,
         )
 
 
@@ -154,30 +201,40 @@ async def get_releases(sess: aiohttp.ClientSession) -> AsyncIterator[Release]:
             page = r.links.get("next", {}).get("url", None)
             for item in await r.json():
                 if any(a["name"] == "version.json" for a in item["assets"]):
-                    yield Release.from_json(sess, item)
+                    yield await Release.from_json(sess, item)
 
 
 async def main():
-    base_path = Path(".")
+    out_path = Path(".")
 
     with TemporaryDirectory() as d:
         key = await Gpg.new("GitHub Actions Bot", dir=d)
-        key_id, key_armor = await asyncio.gather(key.key_id(), key.armor())
-        async with aiohttp.ClientSession() as sess:
-            await asyncio.gather(
-                *[
-                    r.write(base_path, (key_id, key_armor))
-                    async for r in get_releases(sess)
-                ]
-            )
+        releases = defaultdict(list)
 
-        path = base_path / ".well-known" / "terraform.json"
+        async with aiohttp.ClientSession() as sess:
+            async for r in get_releases(sess):
+                releases[r.provider].append(r)
+
+        path = out_path / ".well-known" / "terraform.json"
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write(
+        path.write_text(
             json.dumps(
                 {
                     "providers.v1": f"https://{user}.github.io/{repo}/registry/providers/v1/"
                 }
+            )
+        )
+        base_path = out_path / "registry" / "providers" / "v1"
+
+        for provider, provider_releases in releases.items():
+            path = base_path / provider / "versions"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps([r.version_doc for r in provider_releases]))
+
+        await asyncio.gather(
+            *(
+                r.write_files(base_path, key)
+                for r in chain.from_iterable(releases.values())
             )
         )
 
