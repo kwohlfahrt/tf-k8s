@@ -146,23 +146,24 @@ jobs:
       matrix:
         provider: ${{ fromJson(needs.get-providers.outputs.providers) }}
     env:
+      PROVIDER: ${{ matrix.provider }}
       VERSION: ${{ needs.get-providers.outputs.version }}
     steps:
       - uses: actions/download-artifact@v4
         with:
-          pattern: terraform-provider-k8s-${{ matrix.provider }}_*
+          pattern: terraform-provider-k8s-${{ env.PROVIDER }}_*
           merge-multiple: true
       - name: generate version.json
         run: |
           ls *.zip \
-            | sed -r 's/terraform-provider-k8s-'${{ matrix.provider }}_${VERSION}'_([a-z]+)_([a-z0-9]+).zip/{"os": "\1", "arch": "\2"}/' \
+            | sed -r 's/terraform-provider-k8s-'${PROVIDER}_${VERSION}'_([a-z]+)_([a-z0-9]+).zip/{"os": "\1", "arch": "\2"}/' \
             | jq --slurp '{"version": $ENV.VERSION, "protocols": ["6.0"], "platforms": .}' \
             > version.json
       - run: shasum -a 256 terraform-provider-k8s-*.zip > SHA256SUMS
       - uses: softprops/action-gh-release@v2
         if: startswith(github.event.ref, 'refs/tags/')
         with:
-          name: ${{ matrix.provider }} ${{ env.VERSION }}
+          name: ${{ env.PROVIDER }} ${{ env.VERSION }}
           draft: true
           fail_on_unmatched_files: true
           files: |
