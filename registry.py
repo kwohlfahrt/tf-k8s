@@ -142,7 +142,7 @@ class Release:
         for platform in self.platforms:
             path = base / download / platform.os / platform.arch
             path.parent.mkdir(parents=True, exist_ok=True)
-            filename = f"terraform-provider-k8s-{self.provider}_{self.version}_{platform.os}_{platform.arch}.zip"
+            filename = f"terraform-provider-{self.provider}_{self.version}_{platform.os}_{platform.arch}.zip"
             path.write_text(
                 json.dumps(
                     {
@@ -179,7 +179,7 @@ class Release:
             shasums = await r.text()
 
         return cls(
-            provider=provider,
+            provider="k8s-" + provider,
             version=version["version"],
             protocols=version["protocols"],
             platforms=[Platform(**p) for p in version["platforms"]],
