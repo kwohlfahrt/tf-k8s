@@ -33,17 +33,22 @@ func NewResource(typeInfo generic.TypeInfo) tfresource.Resource {
 	return &crdResource{typeInfo: typeInfo}
 }
 
-func (c *crdResource) Metadata(ctx context.Context, req tfresource.MetadataRequest, resp *tfresource.MetadataResponse) {
+func typeName(providerTypeName string, typeInfo generic.TypeInfo) string {
 	groupComponents := []string{}
-	if c.typeInfo.Group != "" {
-		for _, component := range strings.Split(c.typeInfo.Group, ".") {
+	if typeInfo.Group != "" {
+		for _, component := range strings.Split(typeInfo.Group, ".") {
 			groupComponents = append(groupComponents, strings.Replace(component, "-", "", -1))
 		}
 	}
-	nameComponents := []string{req.ProviderTypeName, strings.ToLower(c.typeInfo.Kind)}
+
+	nameComponents := []string{providerTypeName, strings.ToLower(typeInfo.Kind)}
 	nameComponents = append(nameComponents, groupComponents...)
-	nameComponents = append(nameComponents, c.typeInfo.Version)
-	resp.TypeName = strings.Join(nameComponents, "_")
+	nameComponents = append(nameComponents, typeInfo.Version)
+	return strings.Join(nameComponents, "_")
+}
+
+func (c *crdResource) Metadata(ctx context.Context, req tfresource.MetadataRequest, resp *tfresource.MetadataResponse) {
+	resp.TypeName = typeName(req.ProviderTypeName, c.typeInfo)
 }
 
 func (c *crdResource) Schema(ctx context.Context, req tfresource.SchemaRequest, resp *tfresource.SchemaResponse) {
@@ -358,8 +363,22 @@ func (c *crdResource) ImportState(ctx context.Context, req tfresource.ImportStat
 	resp.Private.SetKey(ctx, "import-field-managers", fieldManagerState)
 }
 
+func (c *crdResource) MoveState(context.Context) []tfresource.StateMover {
+	return []tfresource.StateMover{{
+		StateMover: func(ctx context.Context, req tfresource.MoveStateRequest, resp *tfresource.MoveStateResponse) {
+			if req.SourceTypeName != typeName("k8scrd", c.typeInfo) {
+				return
+			}
+
+			// No-op, only the resource name has changed
+			resp.TargetState.Raw = req.SourceState.Raw
+		},
+	}}
+}
+
 var (
 	_ tfresource.Resource                = &crdResource{}
 	_ tfresource.ResourceWithConfigure   = &crdResource{}
 	_ tfresource.ResourceWithImportState = &crdResource{}
+	_ tfresource.ResourceWithMoveState   = &crdResource{}
 )

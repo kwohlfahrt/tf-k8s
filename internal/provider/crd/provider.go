@@ -30,7 +30,7 @@ type CrdProviderModel struct {
 }
 
 func (p *CrdProvider) Metadata(ctx context.Context, req tfprovider.MetadataRequest, resp *tfprovider.MetadataResponse) {
-	resp.TypeName = "k8scrd"
+	resp.TypeName = "k8s"
 	resp.Version = p.version
 }
 
