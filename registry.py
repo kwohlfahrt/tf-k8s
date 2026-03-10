@@ -218,7 +218,9 @@ async def main():
         for provider, provider_releases in releases.items():
             path = base_path / provider / "versions"
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(json.dumps([r.version_doc for r in provider_releases]))
+            path.write_text(
+                json.dumps({"versions": [r.version_doc for r in provider_releases]})
+            )
 
         await asyncio.gather(
             *(
