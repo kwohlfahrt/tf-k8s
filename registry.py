@@ -206,7 +206,6 @@ async def get_releases(sess: aiohttp.ClientSession) -> AsyncIterator[Release]:
 
 async def main():
     out_path = Path(".")
-
     with TemporaryDirectory() as d:
         key = await Gpg.new("GitHub Actions Bot", dir=d)
         releases = defaultdict(list)
@@ -215,17 +214,7 @@ async def main():
             async for r in get_releases(sess):
                 releases[r.provider].append(r)
 
-        path = out_path / ".well-known" / "terraform.json"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(
-            json.dumps(
-                {
-                    "providers.v1": f"https://{user}.github.io/{repo}/registry/providers/v1/"
-                }
-            )
-        )
         base_path = out_path / "registry" / "providers" / "v1"
-
         for provider, provider_releases in releases.items():
             path = base_path / provider / "versions"
             path.parent.mkdir(parents=True, exist_ok=True)
