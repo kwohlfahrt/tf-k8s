@@ -21,7 +21,6 @@ jobs:
       - run: mkdir ./pages
       - run: uv run --frozen --script ../registry.py
         working-directory: ./pages
-      # upload-pages-artifact ignores hidden directories, but we need .well-known.
       - run: tar -cvf "${{ runner.temp }}/artifact.tar" .
         working-directory: ./pages
       - uses: actions/upload-artifact@v4
