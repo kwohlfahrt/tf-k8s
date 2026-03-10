@@ -9,8 +9,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/generic"
-	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/provider"
+	"github.com/kwohlfahrt/tf-k8s/internal/generic"
+	"github.com/kwohlfahrt/tf-k8s/internal/provider"
 	"k8s.io/client-go/dynamic"
 )
 

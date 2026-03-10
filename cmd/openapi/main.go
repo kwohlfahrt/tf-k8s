@@ -10,9 +10,9 @@ import (
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
-	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/generic"
-	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/provider"
-	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types"
+	"github.com/kwohlfahrt/tf-k8s/internal/generic"
+	"github.com/kwohlfahrt/tf-k8s/internal/provider"
+	"github.com/kwohlfahrt/tf-k8s/internal/types"
 	flag "github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeschema "k8s.io/apimachinery/pkg/runtime/schema"

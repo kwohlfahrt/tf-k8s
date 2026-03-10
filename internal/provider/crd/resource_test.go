@@ -12,8 +12,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/config"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/provider"
-	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/provider/crd"
+	"github.com/kwohlfahrt/tf-k8s/internal/provider"
+	"github.com/kwohlfahrt/tf-k8s/internal/provider/crd"
 )
 
 func TestAccResource(t *testing.T) {

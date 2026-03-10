@@ -7,7 +7,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 
-	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/provider/fn"
+	"github.com/kwohlfahrt/tf-k8s/internal/provider/fn"
 )
 
 var version string = "dev"

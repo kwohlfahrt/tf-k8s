@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/function"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
-	generictypes "github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types"
+	generictypes "github.com/kwohlfahrt/tf-k8s/internal/types"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 )
 

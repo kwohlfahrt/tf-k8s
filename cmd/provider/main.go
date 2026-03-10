@@ -8,7 +8,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 
-	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/provider/crd"
+	"github.com/kwohlfahrt/tf-k8s/internal/provider/crd"
 )
 
 var (

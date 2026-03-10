@@ -12,7 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/dynamic"
 
-	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/generic"
+	"github.com/kwohlfahrt/tf-k8s/internal/generic"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
