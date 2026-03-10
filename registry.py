@@ -133,7 +133,7 @@ class Release:
             await gpg.sign(shasums)
             shasums.with_suffix(".sig").rename(base / download / "SHA256SUMS.sig")
 
-        shasums_url = f"https://{user}.github.io/{repo}/registry/providers/v1/{download}/SHA256SUMS.sig"
+        shasums_url = f"https://{user}.github.io/{repo}/registry/providers/v1/{repo}/{download}/SHA256SUMS.sig"
         file_hashes = {
             filename: shasum
             for shasum, filename in map(str.split, self.shasums.splitlines())
@@ -214,7 +214,7 @@ async def main():
             async for r in get_releases(sess):
                 releases[r.provider].append(r)
 
-        base_path = out_path / "registry" / "providers" / "v1"
+        base_path = out_path / "registry" / "providers" / "v1" / repo
         for provider, provider_releases in releases.items():
             path = base_path / provider / "versions"
             path.parent.mkdir(parents=True, exist_ok=True)
