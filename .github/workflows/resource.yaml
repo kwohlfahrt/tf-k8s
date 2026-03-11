@@ -126,7 +126,7 @@ jobs:
         id: build
         run: |
           PROVIDER_NAME=terraform-provider-k8s-${PROVIDER}_v${VERSION}
-          go build -o $PROVIDER_NAME ./cmd/provider
+          go build -o $PROVIDER_NAME -ldflags "-X main.version=$VERSION -X main.provider=$PROVIDER" ./cmd/provider
 
           ZIP_NAME=terraform-provider-k8s-${PROVIDER}_${VERSION}_${GOOS}_${GOARCH}.zip
           echo zip-name=${ZIP_NAME} >> $GITHUB_OUTPUT
