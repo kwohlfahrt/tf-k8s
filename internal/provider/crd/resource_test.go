@@ -49,7 +49,7 @@ func TestAccResource(t *testing.T) {
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: map[string]func() (tfprotov6.ProviderServer, error){
-			"k8scrd": providerserver.NewProtocol6WithError(providerFactory()),
+			"k8s": providerserver.NewProtocol6WithError(providerFactory()),
 		},
 		PreCheck: func() {
 			dataPath := fmt.Sprintf("./fixtures/%s/data.yaml", os.Getenv("PROVIDER"))
@@ -98,7 +98,7 @@ func TestFail(t *testing.T) {
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: map[string]func() (tfprotov6.ProviderServer, error){
-			"k8scrd": providerserver.NewProtocol6WithError(providerFactory()),
+			"k8s": providerserver.NewProtocol6WithError(providerFactory()),
 		},
 		Steps: []resource.TestStep{{
 			Config:          string(failCfg),
