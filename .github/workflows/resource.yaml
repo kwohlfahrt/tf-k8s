@@ -19,7 +19,7 @@ jobs:
       os: ${{ steps.list-providers.outputs.os || steps.tag-provider.outputs.os }}
       arch: ${{ steps.list-providers.outputs.arch || steps.tag-provider.outputs.arch }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - id: tag-provider
         if: startswith(github.event.ref, 'refs/tags/')
         run: |
@@ -50,8 +50,8 @@ jobs:
       TF_ACC: "1"
       PROVIDER: ${{ matrix.provider }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
         with:
           go-version: "1.26"
 
@@ -85,7 +85,7 @@ jobs:
           go generate -x ./internal/provider/crd/...
 
       - name: upload type info
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.provider }}-typeInfos
           path: internal/provider/crd/typeInfos.bin
@@ -111,13 +111,13 @@ jobs:
       GOOS: ${{ matrix.os }}
       GOARCH: ${{ matrix.arch }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
         with:
           go-version: "1.26"
 
       - name: download generated code
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ${{ matrix.provider }}-typeInfos
           path: internal/provider/crd
@@ -132,7 +132,7 @@ jobs:
           echo zip-name=${ZIP_NAME} >> $GITHUB_OUTPUT
           zip ${ZIP_NAME} $PROVIDER_NAME
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.build.outputs.zip-name }}
           path: ${{ steps.build.outputs.zip-name }}
@@ -149,7 +149,7 @@ jobs:
       PROVIDER: ${{ matrix.provider }}
       VERSION: ${{ needs.get-providers.outputs.version }}
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: terraform-provider-k8s-${{ env.PROVIDER }}_*
           merge-multiple: true
