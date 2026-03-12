@@ -371,7 +371,7 @@ func (c *crdResource) MoveState(context.Context) []tfresource.StateMover {
 			}
 
 			// No-op, only the resource name has changed
-			resp.TargetState.Raw = req.SourceState.Raw
+			// resp.TargetState.Raw = req.SourceState.Raw
 		},
 	}}
 }

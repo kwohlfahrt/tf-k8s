@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
@@ -42,8 +44,7 @@ func TestAccResource(t *testing.T) {
 		t.Fatal(err)
 	}
 	var checkSpeck checkSpec
-	err = json.Unmarshal(rawCheckSpec, &checkSpeck)
-	if err != nil {
+	if err = json.Unmarshal(rawCheckSpec, &checkSpeck); err != nil {
 		t.Fatal(err)
 	}
 
@@ -101,4 +102,81 @@ func TestFail(t *testing.T) {
 			ExpectError:              regexp.MustCompile("already exists"),
 		}},
 	})
+}
+
+func patchState(wd string) error {
+	matches, err := filepath.Glob(fmt.Sprintf("%s/*/terraform.tfstate", wd))
+	if err != nil {
+		return err
+	}
+	if len(matches) != 1 {
+		return fmt.Errorf("Expected exactly one state file, found %d", len(matches))
+	}
+	match := matches[0]
+
+	rawState, err := os.ReadFile(match)
+	if err != nil {
+		return err
+	}
+	var state map[string]any
+	if err = json.Unmarshal(rawState, &state); err != nil {
+		return err
+	}
+	resources := state["resources"].([]any)
+	for _, resource := range resources {
+		resource := resource.(map[string]any)
+		typ := resource["type"].(string)
+		if typ, isK8s := strings.CutPrefix(typ, "k8s_"); isK8s {
+			resource["type"] = "k8scrd_" + typ
+		}
+	}
+
+	rawState, err = json.Marshal(state)
+	if err != nil {
+		return err
+	}
+	if err = os.WriteFile(match, rawState, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
+func TestMigration(t *testing.T) {
+	kubeconfig, err := os.ReadFile(os.Getenv("KUBECONFIG"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wd := t.TempDir()
+	protoV6ProviderFactories := providerFactory(t)
+	matches, err := filepath.Glob(fmt.Sprintf("./fixtures/%s/migrations/*.tf", os.Getenv("PROVIDER")))
+	if len(matches) == 0 {
+		t.Skip("No migration tests configured")
+	}
+	for _, cfg := range matches {
+		if strings.HasSuffix(cfg, "-init.tf") {
+			continue
+		}
+
+		initCfg := strings.TrimSuffix(cfg, ".tf") + "-init.tf"
+		resource.Test(t, resource.TestCase{
+			WorkingDir: wd,
+			Steps: []resource.TestStep{
+				{
+					ProtoV6ProviderFactories: protoV6ProviderFactories,
+					ConfigFile:               config.StaticFile(initCfg),
+					ConfigVariables:          config.Variables{"kubeconfig": config.StringVariable(string(kubeconfig))},
+				},
+				{
+					PreConfig:                func() { patchState(wd) },
+					ProtoV6ProviderFactories: protoV6ProviderFactories,
+					ConfigFile:               config.StaticFile(cfg),
+					ConfigVariables: config.Variables{
+						"kubeconfig": config.StringVariable(string(kubeconfig)),
+						"update":     config.BoolVariable(true),
+					},
+				},
+			},
+		})
+	}
 }
