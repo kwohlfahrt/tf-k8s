@@ -1,9 +1,0 @@
-{
-    "Properties": [
-        {
-            "Name": "data.k8scrd_foo_example_com_v1.foo",
-            "Path": ["manifest", "spec", "foo"],
-            "Value": "foo"
-        }
-    ]
-}

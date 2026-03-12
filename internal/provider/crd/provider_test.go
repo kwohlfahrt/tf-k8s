@@ -66,6 +66,7 @@ type checkResource struct {
 type checkSpec struct {
 	Resources  []checkResource
 	Properties []checkProperty
+	State      []checkProperty
 	Outputs    []checkProperty
 }
 

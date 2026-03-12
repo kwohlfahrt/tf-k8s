@@ -12,6 +12,10 @@ provider "k8scrd" {
   kubeconfig = var.kubeconfig
 }
 
+data "k8scrd_foo_example_com_v1" "foo" {
+  manifest = { metadata = { name = "foo", namespace = "default" } }
+}
+
 resource "k8scrd_foo_example_com_v1" "bar" {
   manifest = {
     metadata = { name = "bar", namespace = "default" }
@@ -36,4 +40,16 @@ resource "k8scrd_foo_example_com_v1" "baz" {
 import {
   to = k8scrd_foo_example_com_v1.baz
   id = "kubectl:default/baz"
+}
+
+output "foo" {
+  value = provider::k8scrd::parse_foo_example_com_v1({
+    apiVersion = "example.com/v1"
+    kind = "Foo"
+    metadata = {
+      name      = "bar"
+      namespace = "default"
+    }
+    spec = { foo = "bar" }
+  })
 }
