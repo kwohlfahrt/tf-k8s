@@ -1,9 +1,0 @@
-{
-    "Outputs": [
-        {
-            "Name": "pod",
-            "Path": ["spec", "containers", 0, "image"],
-            "Value": "ubuntu:22.04"
-        }
-    ]
-}

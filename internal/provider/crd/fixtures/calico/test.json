@@ -1,4 +1,11 @@
 {
+    "State": [
+        {
+            "Name": "data.k8scrd_ippool_projectcalico_org_v3.foo",
+            "Path": ["manifest", "spec", "nat_outgoing"],
+            "Value": true
+        }
+    ],
     "Properties": [
         {
             "Name": "k8scrd_ippool_projectcalico_org_v3.bar",
@@ -31,6 +38,13 @@
             "Metadata": {
                 "name": "baz"
             }
+        }
+    ],
+    "Outputs": [
+        {
+            "Name": "ippool",
+            "Path": ["spec", "cidr"],
+            "Value": "198.51.100.0/30"
         }
     ]
 }
