@@ -3,23 +3,23 @@ variable "kubeconfig" {
   sensitive = true
 }
 
-provider "k8scrd" {
+provider "k8s" {
   kubeconfig = var.kubeconfig
 }
 
-data "k8scrd_deployment_apps_v1" "foo" {
+data "k8s_deployment_apps_v1" "foo" {
   manifest = { metadata = { name = "foo", namespace = "default" } }
 }
 
-data "k8scrd_configmap_v1" "foo" {
+data "k8s_configmap_v1" "foo" {
   manifest = { metadata = { name = "foo", namespace = "default" } }
 }
 
-data "k8scrd_namespace_v1" "foo" {
+data "k8s_namespace_v1" "foo" {
   manifest = { metadata = { name = "foo" } }
 }
 
-resource "k8scrd_deployment_apps_v1" "bar" {
+resource "k8s_deployment_apps_v1" "bar" {
   manifest = {
     metadata = {
       name      = "bar"
@@ -50,14 +50,14 @@ resource "k8scrd_deployment_apps_v1" "bar" {
   }
 }
 
-resource "k8scrd_configmap_v1" "bar" {
+resource "k8s_configmap_v1" "bar" {
   manifest = {
     metadata = { name = "bar", namespace = "default" }
     data     = { "foo.txt" = "bar" }
   }
 }
 
-resource "k8scrd_namespace_v1" "bar" {
+resource "k8s_namespace_v1" "bar" {
   manifest = {
     metadata = {
       name   = "bar"
@@ -66,7 +66,7 @@ resource "k8scrd_namespace_v1" "bar" {
   }
 }
 
-resource "k8scrd_clusterrole_rbac_authorization_k8s_io_v1" "bar" {
+resource "k8s_clusterrole_rbac_authorization_k8s_io_v1" "bar" {
   manifest = {
     metadata = { name = "bar" }
     rules = [
@@ -75,7 +75,7 @@ resource "k8scrd_clusterrole_rbac_authorization_k8s_io_v1" "bar" {
   }
 }
 
-resource "k8scrd_priorityclass_scheduling_k8s_io_v1" "bar" {
+resource "k8s_priorityclass_scheduling_k8s_io_v1" "bar" {
   manifest = {
     metadata = { name = "bar" }
     preemption_policy = "Never"
@@ -83,14 +83,14 @@ resource "k8scrd_priorityclass_scheduling_k8s_io_v1" "bar" {
   }
 }
 
-resource "k8scrd_gatewayclass_gateway_networking_k8s_io_v1" "bar" {
+resource "k8s_gatewayclass_gateway_networking_k8s_io_v1" "bar" {
   manifest = {
     metadata = { name = "bar" }
     spec = { controller_name = "example.com/foo" }
   }
 }
 
-resource "k8scrd_deployment_apps_v1" "baz" {
+resource "k8s_deployment_apps_v1" "baz" {
   manifest = {
     metadata = {
       name      = "baz"
@@ -114,11 +114,11 @@ resource "k8scrd_deployment_apps_v1" "baz" {
 }
 
 import {
-  to = k8scrd_deployment_apps_v1.baz
+  to = k8s_deployment_apps_v1.baz
   id = "kubectl:default/baz"
 }
 
-resource "k8scrd_clusterrolebinding_rbac_authorization_k8s_io_v1" "baz" {
+resource "k8s_clusterrolebinding_rbac_authorization_k8s_io_v1" "baz" {
   manifest = {
     metadata = { name = "baz" }
     role_ref = {
@@ -130,12 +130,12 @@ resource "k8scrd_clusterrolebinding_rbac_authorization_k8s_io_v1" "baz" {
 }
 
 import {
-  to = k8scrd_clusterrolebinding_rbac_authorization_k8s_io_v1.baz
+  to = k8s_clusterrolebinding_rbac_authorization_k8s_io_v1.baz
   id = "kubectl:baz"
 }
 
 output "pod" {
-  value = provider::k8scrd::parse_pod_v1({
+  value = provider::k8s::parse_pod_v1({
     apiVersion = "v1"
     kind       = "Pod"
     metadata   = { name = "bar", namespace = "default" }
@@ -147,7 +147,7 @@ output "pod" {
 }
 
 output "configmap" {
-  value = provider::k8scrd::parse_configmap_v1({
+  value = provider::k8s::parse_configmap_v1({
     apiVersion = "v1"
     kind       = "ConfigMap"
     metadata   = { name = "bar", namespace = "default" }

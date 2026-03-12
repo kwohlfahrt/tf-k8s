@@ -1,24 +1,24 @@
 {
     "State": [
         {
-            "Name": "data.k8scrd_foo_example_com_v1.foo",
+            "Name": "data.k8s_foo_example_com_v1.foo",
             "Path": ["manifest", "spec", "foo"],
             "Value": "foo"
         }
     ],
     "Properties": [
         {
-            "Name": "k8scrd_foo_example_com_v1.bar",
+            "Name": "k8s_foo_example_com_v1.bar",
             "Path": ["manifest", "spec", "foo"],
             "Value": "bar"
         },
         {
-            "Name": "k8scrd_bar_example_com_v1.bar",
+            "Name": "k8s_bar_example_com_v1.bar",
             "Path": ["manifest", "spec", "bar"],
             "Value": "bar"
         },
         {
-            "Name": "k8scrd_foo_example_com_v1.baz",
+            "Name": "k8s_foo_example_com_v1.baz",
             "Path": ["manifest", "spec", "foo"],
             "Value": "baz"
         }

@@ -8,29 +8,29 @@ variable "update" {
   default = false
 }
 
-provider "k8scrd" {
+provider "k8s" {
   kubeconfig = var.kubeconfig
 }
 
-data "k8scrd_foo_example_com_v1" "foo" {
+data "k8s_foo_example_com_v1" "foo" {
   manifest = { metadata = { name = "foo", namespace = "default" } }
 }
 
-resource "k8scrd_foo_example_com_v1" "bar" {
+resource "k8s_foo_example_com_v1" "bar" {
   manifest = {
     metadata = { name = "bar", namespace = "default" }
     spec     = { foo = "bar" }
   }
 }
 
-resource "k8scrd_bar_example_com_v1" "bar" {
+resource "k8s_bar_example_com_v1" "bar" {
   manifest = {
     metadata = { name = "bar", namespace = "default" }
     spec     = { bar = var.update ? "barbar" : "bar" }
   }
 }
 
-resource "k8scrd_foo_example_com_v1" "baz" {
+resource "k8s_foo_example_com_v1" "baz" {
   manifest = {
     metadata = { name = "baz", namespace = "default" }
     spec     = { foo = "baz" }
@@ -38,12 +38,12 @@ resource "k8scrd_foo_example_com_v1" "baz" {
 }
 
 import {
-  to = k8scrd_foo_example_com_v1.baz
+  to = k8s_foo_example_com_v1.baz
   id = "kubectl:default/baz"
 }
 
 output "foo" {
-  value = provider::k8scrd::parse_foo_example_com_v1({
+  value = provider::k8s::parse_foo_example_com_v1({
     apiVersion = "example.com/v1"
     kind = "Foo"
     metadata = {

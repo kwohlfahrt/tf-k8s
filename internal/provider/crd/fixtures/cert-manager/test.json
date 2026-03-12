@@ -1,24 +1,24 @@
 {
     "State": [
         {
-            "Name": "data.k8scrd_certificate_certmanager_io_v1.foo",
+            "Name": "data.k8s_certificate_certmanager_io_v1.foo",
             "Path": ["manifest", "spec", "issuer_ref", "name"],
             "Value": "self-signed"
         },
         {
-            "Name": "data.k8scrd_issuer_certmanager_io_v1.foo",
+            "Name": "data.k8s_issuer_certmanager_io_v1.foo",
             "Path": ["manifest", "spec", "acme", "solvers", 0, "dns01", "webhook", "config", "x"],
             "Value": "x"
         }
     ],
     "Properties": [
         {
-            "Name": "k8scrd_certificate_certmanager_io_v1.bar",
+            "Name": "k8s_certificate_certmanager_io_v1.bar",
             "Path": ["manifest", "spec", "issuer_ref", "name"],
             "Value": "self-signed"
         },
         {
-            "Name": "k8scrd_certificate_certmanager_io_v1.baz",
+            "Name": "k8s_certificate_certmanager_io_v1.baz",
             "Path": ["manifest", "spec", "issuer_ref", "name" ],
             "Value": "self-signed"
         }

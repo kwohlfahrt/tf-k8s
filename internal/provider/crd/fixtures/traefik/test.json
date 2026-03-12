@@ -1,19 +1,19 @@
 {
     "State": [
         {
-            "Name": "data.k8scrd_middleware_traefik_io_v1alpha1.foo",
+            "Name": "data.k8s_middleware_traefik_io_v1alpha1.foo",
             "Path": ["manifest", "spec", "forward_auth", "address"],
             "Value": "http://foo.example.com/auth"
         }
     ],
     "Properties": [
         {
-            "Name": "k8scrd_middleware_traefik_io_v1alpha1.bar",
+            "Name": "k8s_middleware_traefik_io_v1alpha1.bar",
             "Path": ["manifest", "spec", "forward_auth", "address"],
             "Value": "http://bar.example.com/auth"
         },
         {
-            "Name": "k8scrd_middleware_traefik_io_v1alpha1.baz",
+            "Name": "k8s_middleware_traefik_io_v1alpha1.baz",
             "Path": ["manifest", "spec", "forward_auth", "address"],
             "Value": "http://baz.example.com/auth"
         }
