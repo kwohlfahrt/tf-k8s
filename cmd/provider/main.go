@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
@@ -11,8 +12,8 @@ import (
 )
 
 var (
-	version string = "dev"
-	name    string = "github.com/kwohlfahrt/k8scrd"
+	provider string = "example"
+	version  string = "dev"
 )
 
 func main() {
@@ -22,7 +23,7 @@ func main() {
 	flag.Parse()
 
 	opts := providerserver.ServeOpts{
-		Address: name,
+		Address: fmt.Sprintf("kwohlfahrt.github.io/tf-k8s/k8s-%s", provider),
 		Debug:   debug,
 	}
 	providerFactory, err := crd.New(version)

@@ -18,7 +18,7 @@ jobs:
       os: ${{ steps.list-providers.outputs.os || steps.tag-provider.outputs.os }}
       arch: ${{ steps.list-providers.outputs.arch || steps.tag-provider.outputs.arch }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - id: tag-provider
         if: startswith(github.event.ref, 'refs/tags/')
         run: |
@@ -37,8 +37,8 @@ jobs:
     env:
       TF_ACC: "1"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
         with:
           go-version: "1.26"
 
@@ -62,8 +62,8 @@ jobs:
       GOOS: ${{ matrix.os }}
       GOARCH: ${{ matrix.arch }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
         with:
           go-version: "1.26"
 
@@ -71,13 +71,13 @@ jobs:
         id: build
         run: |
           PROVIDER_NAME=terraform-provider-k8s-${PROVIDER}_v${VERSION}
-          go build -o $PROVIDER_NAME ./cmd/function
+          go build -o $PROVIDER_NAME -ldflags "-X main.version=$VERSION" ./cmd/function
 
           ZIP_NAME=terraform-provider-k8s-${PROVIDER}_${VERSION}_${GOOS}_${GOARCH}.zip
           echo zip-name=${ZIP_NAME} >> $GITHUB_OUTPUT
           zip ${ZIP_NAME} $PROVIDER_NAME
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.build.outputs.zip-name }}
           path: ${{ steps.build.outputs.zip-name }}
@@ -91,7 +91,7 @@ jobs:
       PROVIDER: function
       VERSION: ${{ needs.get-providers.outputs.version }}
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: terraform-provider-k8s-${{ env.PROVIDER }}_*
           merge-multiple: true
