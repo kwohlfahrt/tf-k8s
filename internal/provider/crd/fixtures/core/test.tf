@@ -7,6 +7,18 @@ provider "k8scrd" {
   kubeconfig = var.kubeconfig
 }
 
+data "k8scrd_deployment_apps_v1" "foo" {
+  manifest = { metadata = { name = "foo", namespace = "default" } }
+}
+
+data "k8scrd_configmap_v1" "foo" {
+  manifest = { metadata = { name = "foo", namespace = "default" } }
+}
+
+data "k8scrd_namespace_v1" "foo" {
+  manifest = { metadata = { name = "foo" } }
+}
+
 resource "k8scrd_deployment_apps_v1" "bar" {
   manifest = {
     metadata = {
@@ -120,4 +132,25 @@ resource "k8scrd_clusterrolebinding_rbac_authorization_k8s_io_v1" "baz" {
 import {
   to = k8scrd_clusterrolebinding_rbac_authorization_k8s_io_v1.baz
   id = "kubectl:baz"
+}
+
+output "pod" {
+  value = provider::k8scrd::parse_pod_v1({
+    apiVersion = "v1"
+    kind       = "Pod"
+    metadata   = { name = "bar", namespace = "default" }
+    spec = { containers = [
+      { name = "ubuntu", image = "ubuntu:22.04", livenessProbe = { httpGet = { port = "healthz" } } },
+      { name = "also-ubuntu", image = "ubuntu:22.04" }
+    ] }
+  })
+}
+
+output "configmap" {
+  value = provider::k8scrd::parse_configmap_v1({
+    apiVersion = "v1"
+    kind       = "ConfigMap"
+    metadata   = { name = "bar", namespace = "default" }
+    data       = null // Sometimes seen in manifests with empty data
+  })
 }

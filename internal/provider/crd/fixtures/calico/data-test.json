@@ -1,9 +1,0 @@
-{
-    "Properties": [
-        {
-            "Name": "data.k8scrd_ippool_projectcalico_org_v3.foo",
-            "Path": ["manifest", "spec", "nat_outgoing"],
-            "Value": true
-        }
-    ]
-}

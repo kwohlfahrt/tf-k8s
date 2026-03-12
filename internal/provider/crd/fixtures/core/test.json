@@ -1,4 +1,21 @@
 {
+    "State": [
+        {
+            "Name": "data.k8scrd_deployment_apps_v1.foo",
+            "Path": ["manifest", "spec", "replicas"],
+            "Value": 0
+        },
+        {
+            "Name": "data.k8scrd_configmap_v1.foo",
+            "Path": ["manifest", "data", "foo.txt"],
+            "Value": "hello, world!\n"
+        },
+        {
+            "Name": "data.k8scrd_namespace_v1.foo",
+            "Path": ["manifest", "metadata", "name"],
+            "Value": "foo"
+        }
+    ],
     "Properties": [
         {
             "Name": "k8scrd_configmap_v1.bar",
@@ -99,6 +116,13 @@
             "Metadata": {
                 "name": "baz"
             }
+        }
+    ],
+    "Outputs": [
+        {
+            "Name": "pod",
+            "Path": ["spec", "containers", 0, "image"],
+            "Value": "ubuntu:22.04"
         }
     ]
 }

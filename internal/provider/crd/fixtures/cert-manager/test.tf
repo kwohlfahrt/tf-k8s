@@ -7,6 +7,14 @@ provider "k8scrd" {
   kubeconfig = var.kubeconfig
 }
 
+data "k8scrd_certificate_certmanager_io_v1" "foo" {
+  manifest = { metadata = { name = "foo", namespace = "default" } }
+}
+
+data "k8scrd_issuer_certmanager_io_v1" "foo" {
+  manifest = { metadata = { name = "foo", namespace = "default" } }
+}
+
 resource "k8scrd_certificate_certmanager_io_v1" "bar" {
   manifest = {
     metadata = { name = "bar", namespace = "default" }
@@ -36,4 +44,19 @@ resource "k8scrd_certificate_certmanager_io_v1" "baz" {
 import {
   to = k8scrd_certificate_certmanager_io_v1.baz
   id = "kubectl:default/baz"
+}
+
+output "certificate" {
+  value = provider::k8scrd::parse_certificate_certmanager_io_v1({
+    apiVersion = "cert-manager.io/v1"
+    kind       = "Certificate"
+    metadata   = { name = "bar", namespace = "default" }
+    spec = {
+      issuerRef   = { kind = "ClusterIssuer", name = "self-signed" }
+      dnsNames    = ["example.org"]
+      duration    = "2160h"
+      renewBefore = "360h"
+      secretName  = "example-org"
+    }
+  })
 }

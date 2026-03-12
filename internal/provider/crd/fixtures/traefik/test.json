@@ -1,4 +1,11 @@
 {
+    "State": [
+        {
+            "Name": "data.k8scrd_middleware_traefik_io_v1alpha1.foo",
+            "Path": ["manifest", "spec", "forward_auth", "address"],
+            "Value": "http://foo.example.com/auth"
+        }
+    ],
     "Properties": [
         {
             "Name": "k8scrd_middleware_traefik_io_v1alpha1.bar",
@@ -33,6 +40,13 @@
                 "name": "baz",
                 "namespace": "default"
             }
+        }
+    ],
+    "Outputs": [
+        {
+            "Name": "foo",
+            "Path": ["spec", "forward_auth", "address"],
+            "Value": "http://example.com/auth"
         }
     ]
 }

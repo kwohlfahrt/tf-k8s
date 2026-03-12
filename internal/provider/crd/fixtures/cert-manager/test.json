@@ -1,4 +1,16 @@
 {
+    "State": [
+        {
+            "Name": "data.k8scrd_certificate_certmanager_io_v1.foo",
+            "Path": ["manifest", "spec", "issuer_ref", "name"],
+            "Value": "self-signed"
+        },
+        {
+            "Name": "data.k8scrd_issuer_certmanager_io_v1.foo",
+            "Path": ["manifest", "spec", "acme", "solvers", 0, "dns01", "webhook", "config", "x"],
+            "Value": "x"
+        }
+    ],
     "Properties": [
         {
             "Name": "k8scrd_certificate_certmanager_io_v1.bar",
@@ -33,6 +45,13 @@
                 "name": "baz",
                 "namespace": "default"
             }
+        }
+    ],
+    "Outputs": [
+        {
+            "Name": "certificate",
+            "Path": ["spec", "issuer_ref", "name"],
+            "Value": "self-signed"
         }
     ]
 }
