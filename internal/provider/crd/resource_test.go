@@ -16,6 +16,16 @@ import (
 	"github.com/kwohlfahrt/tf-k8s/internal/provider/crd"
 )
 
+func providerFactory(t *testing.T) map[string]func() (tfprotov6.ProviderServer, error) {
+	providerFactory, err := crd.New("test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return map[string]func() (tfprotov6.ProviderServer, error){
+		"k8s": providerserver.NewProtocol6WithError(providerFactory()),
+	}
+}
+
 func TestAccResource(t *testing.T) {
 	kubeconfig, err := os.ReadFile(os.Getenv("KUBECONFIG"))
 	if err != nil {
@@ -23,11 +33,6 @@ func TestAccResource(t *testing.T) {
 	}
 
 	k, err := provider.MakeDynamicClient(kubeconfig)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	providerFactory, err := crd.New("test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,15 +47,9 @@ func TestAccResource(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cfg, err := os.ReadFile(fmt.Sprintf("./fixtures/%s/test.tf", os.Getenv("PROVIDER")))
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	cfg := fmt.Sprintf("./fixtures/%s/test.tf", os.Getenv("PROVIDER"))
+	protoV6ProviderFactories := providerFactory(t)
 	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: map[string]func() (tfprotov6.ProviderServer, error){
-			"k8s": providerserver.NewProtocol6WithError(providerFactory()),
-		},
 		PreCheck: func() {
 			dataPath := fmt.Sprintf("./fixtures/%s/data.yaml", os.Getenv("PROVIDER"))
 			cmd := exec.Command("kubectl", "apply", "--server-side", "-f", dataPath)
@@ -60,14 +59,16 @@ func TestAccResource(t *testing.T) {
 		},
 		Steps: []resource.TestStep{
 			{
-				Config:            string(cfg),
-				ConfigVariables:   config.Variables{"kubeconfig": config.StringVariable(string(kubeconfig))},
-				Check:             makeChecks(k, checkSpeck.Resources),
-				ConfigPlanChecks:  makeConfigChecks(checkSpeck.Properties, checkSpeck.Outputs),
-				ConfigStateChecks: makeStateChecks(checkSpeck.State),
+				ProtoV6ProviderFactories: protoV6ProviderFactories,
+				ConfigFile:               config.StaticFile(cfg),
+				ConfigVariables:          config.Variables{"kubeconfig": config.StringVariable(string(kubeconfig))},
+				Check:                    makeChecks(k, checkSpeck.Resources),
+				ConfigPlanChecks:         makeConfigChecks(checkSpeck.Properties, checkSpeck.Outputs),
+				ConfigStateChecks:        makeStateChecks(checkSpeck.State),
 			},
 			{
-				Config: string(cfg),
+				ProtoV6ProviderFactories: protoV6ProviderFactories,
+				ConfigFile:               config.StaticFile(cfg),
 				ConfigVariables: config.Variables{
 					"kubeconfig": config.StringVariable(string(kubeconfig)),
 					"update":     config.BoolVariable(true),
@@ -84,26 +85,20 @@ func TestFail(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	providerFactory, err := crd.New("test")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	failCfg, err := os.ReadFile(fmt.Sprintf("./fixtures/%s/fail.tf", os.Getenv("PROVIDER")))
-	if err != nil && os.IsNotExist(err) {
+	failCfg := fmt.Sprintf("./fixtures/%s/fail.tf", os.Getenv("PROVIDER"))
+	if _, err := os.Stat(failCfg); err != nil && os.IsNotExist(err) {
 		t.Skip("No failure test configured")
 	} else if err != nil {
 		t.Fatal(err)
 	}
 
+	protoV6ProviderFactories := providerFactory(t)
 	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: map[string]func() (tfprotov6.ProviderServer, error){
-			"k8s": providerserver.NewProtocol6WithError(providerFactory()),
-		},
 		Steps: []resource.TestStep{{
-			Config:          string(failCfg),
-			ConfigVariables: config.Variables{"kubeconfig": config.StringVariable(string(kubeconfig))},
-			ExpectError:     regexp.MustCompile("already exists"),
+			ProtoV6ProviderFactories: protoV6ProviderFactories,
+			ConfigFile:               config.StaticFile(failCfg),
+			ConfigVariables:          config.Variables{"kubeconfig": config.StringVariable(string(kubeconfig))},
+			ExpectError:              regexp.MustCompile("already exists"),
 		}},
 	})
 }

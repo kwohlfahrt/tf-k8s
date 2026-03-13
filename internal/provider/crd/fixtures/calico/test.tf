@@ -3,6 +3,14 @@ variable "kubeconfig" {
   sensitive = true
 }
 
+terraform {
+  required_providers {
+    k8s = {
+      source = "registry.terraform.io/hashicorp/k8s"
+    }
+  }
+}
+
 provider "k8s" {
   kubeconfig = var.kubeconfig
 }
