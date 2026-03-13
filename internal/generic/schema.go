@@ -39,18 +39,13 @@ func (t TypeInfo) Interface(client *dynamic.DynamicClient, namespace string) dyn
 	return resource
 }
 
-func OpenApiToTfSchema(ctx context.Context, typeInfo TypeInfo, isDatasSource bool) (schema.Attribute, error) {
+func OpenApiToTfSchema(ctx context.Context, typeInfo TypeInfo, isDatasSource bool) schema.Attribute {
 	schemaType := typeInfo.Schema
 
-	attr, err := schemaType.SchemaType(ctx, types.SchemaTypeOpts{IsDataSource: isDatasSource})
-	if err != nil {
-		return nil, err
-	}
-
+	attr := schemaType.SchemaType(ctx, types.SchemaTypeOpts{IsDataSource: isDatasSource})
 	dynamicAttr := attr.(schema.DynamicAttribute)
 	dynamicAttr.Validators = append(dynamicAttr.Validators, metadataValidator{isNamespaced: typeInfo.Namespaced})
-
-	return dynamicAttr, err
+	return dynamicAttr
 }
 
 type metadataValidator struct {
