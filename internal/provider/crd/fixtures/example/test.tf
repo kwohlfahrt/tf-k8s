@@ -36,6 +36,7 @@ resource "k8s_bar_example_com_v1" "bar" {
     metadata = { name = "bar", namespace = "default" }
     spec     = { bar = var.update ? "barbar" : "bar" }
   }
+  field_manager = var.update ? "tofu-k8s" : "not-tofu-k8s"
 }
 
 resource "k8s_foo_example_com_v1" "baz" {

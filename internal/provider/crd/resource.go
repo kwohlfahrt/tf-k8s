@@ -226,11 +226,6 @@ func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, 
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	var state types.KubernetesObjectValue
-	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("manifest"), &state)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
 	var fieldManager string
 	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("field_manager"), &fieldManager)...)
 	if resp.Diagnostics.HasError() {
@@ -242,6 +237,43 @@ func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, 
 		return
 	}
 
+	if fieldManager != planFieldManager {
+		var oldState types.KubernetesObjectValue
+		resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("manifest"), &oldState)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		obj, diags := generic.ValueToUnstructured(ctx, oldState, c.typeInfo)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		_, err := c.typeInfo.Interface(c.client, meta.Namespace).
+			Apply(ctx, meta.Name, obj, metav1.ApplyOptions{FieldManager: planFieldManager})
+		if err != nil {
+			resp.Diagnostics.AddError("Unable to apply new fieldManager", err.Error())
+			return
+		}
+
+		empty := unstructured.Unstructured{Object: map[string]interface{}{
+			"apiVersion": c.typeInfo.GroupVersionResource().GroupVersion().String(),
+			"kind":       c.typeInfo.Kind,
+			"metadata":   map[string]interface{}{"name": meta.Name, "namespace": meta.Namespace},
+		}}
+		_, err = c.typeInfo.Interface(c.client, meta.Namespace).
+			Apply(ctx, meta.Name, &empty, metav1.ApplyOptions{FieldManager: fieldManager})
+		if err != nil {
+			resp.Diagnostics.AddError("Unable to remove old fieldManager", err.Error())
+			return
+		}
+	}
+
+	var state types.KubernetesObjectValue
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("manifest"), &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	obj, diags := generic.ValueToUnstructured(ctx, state, c.typeInfo)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -257,21 +289,7 @@ func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, 
 		return
 	}
 
-	if fieldManager != planFieldManager {
-		empty := unstructured.Unstructured{Object: map[string]interface{}{
-			"apiVersion": c.typeInfo.GroupVersionResource().GroupVersion().String(),
-			"kind":       c.typeInfo.Kind,
-			"metadata":   map[string]interface{}{"name": meta.Name, "namespace": meta.Namespace},
-		}}
-		_, err := c.typeInfo.Interface(c.client, meta.Namespace).
-			Apply(ctx, meta.Name, &empty, metav1.ApplyOptions{FieldManager: fieldManager})
-		if err != nil {
-			resp.Diagnostics.AddError("Unable to remove imported fieldManager", err.Error())
-			return
-		}
-	}
-
-	fields, diags := generic.GetManagedFieldSet(obj, defaultFieldManager)
+	fields, diags := generic.GetManagedFieldSet(obj, planFieldManager)
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
@@ -286,7 +304,7 @@ func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, 
 		return
 	}
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("manifest"), state)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("field_manager"), defaultFieldManager)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("field_manager"), planFieldManager)...)
 }
 
 func (c *crdResource) Delete(ctx context.Context, req tfresource.DeleteRequest, resp *tfresource.DeleteResponse) {
