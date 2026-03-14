@@ -3,19 +3,27 @@ variable "kubeconfig" {
   sensitive = true
 }
 
-provider "k8scrd" {
+terraform {
+  required_providers {
+    k8s = {
+      source = "registry.terraform.io/hashicorp/k8s"
+    }
+  }
+}
+
+provider "k8s" {
   kubeconfig = var.kubeconfig
 }
 
-data "k8scrd_certificate_certmanager_io_v1" "foo" {
+data "k8s_certificate_certmanager_io_v1" "foo" {
   manifest = { metadata = { name = "foo", namespace = "default" } }
 }
 
-data "k8scrd_issuer_certmanager_io_v1" "foo" {
+data "k8s_issuer_certmanager_io_v1" "foo" {
   manifest = { metadata = { name = "foo", namespace = "default" } }
 }
 
-resource "k8scrd_certificate_certmanager_io_v1" "bar" {
+resource "k8s_certificate_certmanager_io_v1" "bar" {
   manifest = {
     metadata = { name = "bar", namespace = "default" }
     spec = {
@@ -28,7 +36,7 @@ resource "k8scrd_certificate_certmanager_io_v1" "bar" {
   }
 }
 
-resource "k8scrd_certificate_certmanager_io_v1" "baz" {
+resource "k8s_certificate_certmanager_io_v1" "baz" {
   manifest = {
     metadata = { name = "baz", namespace = "default" }
     spec = {
@@ -42,12 +50,12 @@ resource "k8scrd_certificate_certmanager_io_v1" "baz" {
 }
 
 import {
-  to = k8scrd_certificate_certmanager_io_v1.baz
+  to = k8s_certificate_certmanager_io_v1.baz
   id = "kubectl:default/baz"
 }
 
 output "certificate" {
-  value = provider::k8scrd::parse_certificate_certmanager_io_v1({
+  value = provider::k8s::parse_certificate_certmanager_io_v1({
     apiVersion = "cert-manager.io/v1"
     kind       = "Certificate"
     metadata   = { name = "bar", namespace = "default" }

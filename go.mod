@@ -1,4 +1,4 @@
-module github.com/kwohlfahrt/terraform-provider-k8scrd
+module github.com/kwohlfahrt/tf-k8s
 
 go 1.26.0
 

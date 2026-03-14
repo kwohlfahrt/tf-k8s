@@ -188,14 +188,14 @@ type SchemaTypeOpts struct {
 	IsDataSource bool
 }
 
-func (t KubernetesObjectType) SchemaType(ctx context.Context, opts SchemaTypeOpts) (schema.Attribute, error) {
+func (t KubernetesObjectType) SchemaType(ctx context.Context, opts SchemaTypeOpts) schema.Attribute {
 	return schema.DynamicAttribute{
 		Required:   true,
 		Optional:   false,
 		Computed:   false,
 		CustomType: t,
 		Validators: []validator.Dynamic{t.Validator(ctx, opts.IsDataSource)},
-	}, nil
+	}
 }
 
 func ObjectFromOpenApi(root *spec3.OpenAPI, openapi spec.Schema, path []string) (KubernetesType, error) {

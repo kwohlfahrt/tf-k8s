@@ -12,7 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/dynamic"
 
-	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/generic"
+	"github.com/kwohlfahrt/tf-k8s/internal/generic"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -57,13 +57,9 @@ func (c *crdDataSource) Metadata(ctx context.Context, req datasource.MetadataReq
 }
 
 func (c *crdDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
-	result, err := generic.OpenApiToTfSchema(ctx, c.typeInfo, true)
-	if err != nil {
-		resp.Diagnostics.AddError("Could not convert CRD to schema", err.Error())
-		return
-	}
-
-	resp.Schema = schema.Schema{Attributes: map[string]schema.Attribute{"manifest": result}}
+	resp.Schema = schema.Schema{Attributes: map[string]schema.Attribute{
+		"manifest": generic.OpenApiToTfSchema(ctx, c.typeInfo, true),
+	}}
 }
 
 func (c *crdDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {

@@ -7,8 +7,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/function"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
-	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/generic"
-	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types"
+	"github.com/kwohlfahrt/tf-k8s/internal/generic"
+	"github.com/kwohlfahrt/tf-k8s/internal/types"
 )
 
 var _ function.Function = &ParseYAMLFunction{}

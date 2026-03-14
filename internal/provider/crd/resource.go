@@ -10,8 +10,8 @@ import (
 	tfresource "github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
-	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/generic"
-	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types"
+	"github.com/kwohlfahrt/tf-k8s/internal/generic"
+	"github.com/kwohlfahrt/tf-k8s/internal/types"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -33,29 +33,28 @@ func NewResource(typeInfo generic.TypeInfo) tfresource.Resource {
 	return &crdResource{typeInfo: typeInfo}
 }
 
-func (c *crdResource) Metadata(ctx context.Context, req tfresource.MetadataRequest, resp *tfresource.MetadataResponse) {
+func typeName(providerTypeName string, typeInfo generic.TypeInfo) string {
 	groupComponents := []string{}
-	if c.typeInfo.Group != "" {
-		for _, component := range strings.Split(c.typeInfo.Group, ".") {
+	if typeInfo.Group != "" {
+		for _, component := range strings.Split(typeInfo.Group, ".") {
 			groupComponents = append(groupComponents, strings.Replace(component, "-", "", -1))
 		}
 	}
-	nameComponents := []string{req.ProviderTypeName, strings.ToLower(c.typeInfo.Kind)}
+
+	nameComponents := []string{providerTypeName, strings.ToLower(typeInfo.Kind)}
 	nameComponents = append(nameComponents, groupComponents...)
-	nameComponents = append(nameComponents, c.typeInfo.Version)
-	resp.TypeName = strings.Join(nameComponents, "_")
+	nameComponents = append(nameComponents, typeInfo.Version)
+	return strings.Join(nameComponents, "_")
+}
+
+func (c *crdResource) Metadata(ctx context.Context, req tfresource.MetadataRequest, resp *tfresource.MetadataResponse) {
+	resp.TypeName = typeName(req.ProviderTypeName, c.typeInfo)
 }
 
 func (c *crdResource) Schema(ctx context.Context, req tfresource.SchemaRequest, resp *tfresource.SchemaResponse) {
-	result, err := generic.OpenApiToTfSchema(ctx, c.typeInfo, false)
-	if err != nil {
-		resp.Diagnostics.AddError("Could not convert CRD to schema", err.Error())
-		return
-	}
-
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"manifest": result,
+			"manifest": generic.OpenApiToTfSchema(ctx, c.typeInfo, false),
 			"field_manager": schema.StringAttribute{
 				Required: false,
 				Computed: true,
@@ -358,8 +357,32 @@ func (c *crdResource) ImportState(ctx context.Context, req tfresource.ImportStat
 	resp.Private.SetKey(ctx, "import-field-managers", fieldManagerState)
 }
 
+func (c *crdResource) MoveState(ctx context.Context) []tfresource.StateMover {
+	return []tfresource.StateMover{{
+		SourceSchema: &schema.Schema{
+			Version: 0,
+			Attributes: map[string]schema.Attribute{
+				"manifest": generic.OpenApiToTfSchema(ctx, c.typeInfo, false),
+				"field_manager": schema.StringAttribute{
+					Required: false,
+					Computed: true,
+					Default:  stringdefault.StaticString(fieldManager),
+				},
+			},
+		},
+		StateMover: func(ctx context.Context, req tfresource.MoveStateRequest, resp *tfresource.MoveStateResponse) {
+			if req.SourceTypeName != typeName("k8scrd", c.typeInfo) {
+				return
+			}
+			// No-op, only the resource name has changed
+			resp.TargetState = *req.SourceState
+		},
+	}}
+}
+
 var (
 	_ tfresource.Resource                = &crdResource{}
 	_ tfresource.ResourceWithConfigure   = &crdResource{}
 	_ tfresource.ResourceWithImportState = &crdResource{}
+	_ tfresource.ResourceWithMoveState   = &crdResource{}
 )

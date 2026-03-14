@@ -5,7 +5,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
-	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types"
+	"github.com/kwohlfahrt/tf-k8s/internal/types"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )

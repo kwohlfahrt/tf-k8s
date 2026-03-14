@@ -3,22 +3,30 @@ variable "kubeconfig" {
   sensitive = true
 }
 
-provider "k8scrd" {
+terraform {
+  required_providers {
+    k8s = {
+      source = "registry.terraform.io/hashicorp/k8s"
+    }
+  }
+}
+
+provider "k8s" {
   kubeconfig = var.kubeconfig
 }
 
-data "k8scrd_ippool_projectcalico_org_v3" "foo" {
+data "k8s_ippool_projectcalico_org_v3" "foo" {
   manifest = { metadata = { name = "foo" } }
 }
 
-resource "k8scrd_ippool_projectcalico_org_v3" "bar" {
+resource "k8s_ippool_projectcalico_org_v3" "bar" {
   manifest = {
     metadata = { name = "bar" }
     spec     = { cidr = "198.51.100.128/26" }
   }
 }
 
-resource "k8scrd_ippool_projectcalico_org_v3" "baz" {
+resource "k8s_ippool_projectcalico_org_v3" "baz" {
   manifest = {
     metadata = { name = "baz" }
     spec     = { cidr = "198.51.100.64/26", nat_outgoing = true }
@@ -26,12 +34,12 @@ resource "k8scrd_ippool_projectcalico_org_v3" "baz" {
 }
 
 import {
-  to = k8scrd_ippool_projectcalico_org_v3.baz
+  to = k8s_ippool_projectcalico_org_v3.baz
   id = "kubectl:baz"
 }
 
 output "ippool" {
-  value = provider::k8scrd::parse_ippool_crd_projectcalico_org_v1({
+  value = provider::k8s::parse_ippool_crd_projectcalico_org_v1({
     apiVersion = "v1"
     kind       = "IPPool"
     metadata   = { name = "bar", namespace = "default" }

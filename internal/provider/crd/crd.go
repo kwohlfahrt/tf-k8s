@@ -9,8 +9,8 @@ import (
 	"io"
 
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
-	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/generic"
-	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/types"
+	"github.com/kwohlfahrt/tf-k8s/internal/generic"
+	"github.com/kwohlfahrt/tf-k8s/internal/types"
 )
 
 //go:embed typeInfos.bin

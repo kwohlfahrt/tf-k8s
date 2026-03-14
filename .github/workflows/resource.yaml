@@ -92,7 +92,7 @@ jobs:
 
       - name: go test
         run: |
-          go test -v $(go list -f '{{ join .Deps "\n" }}' ./cmd/provider | grep github.com/kwohlfahrt/terraform-provider-k8scrd)
+          go test -v $(go list -f '{{ join .Deps "\n" }}' ./cmd/provider | grep github.com/kwohlfahrt/tf-k8s)
 
   build:
     runs-on: ubuntu-latest

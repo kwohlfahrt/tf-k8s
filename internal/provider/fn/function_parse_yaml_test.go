@@ -10,7 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
 	"github.com/hashicorp/terraform-plugin-testing/statecheck"
-	"github.com/kwohlfahrt/terraform-provider-k8scrd/internal/provider/fn"
+	"github.com/kwohlfahrt/tf-k8s/internal/provider/fn"
 )
 
 func TestParseYaml(t *testing.T) {
