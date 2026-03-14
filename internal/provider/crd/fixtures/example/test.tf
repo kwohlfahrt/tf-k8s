@@ -41,7 +41,7 @@ resource "k8s_bar_example_com_v1" "bar" {
 resource "k8s_foo_example_com_v1" "baz" {
   manifest = {
     metadata = { name = "baz", namespace = "default" }
-    spec     = { foo = "baz" }
+    spec     = { foo = var.update ? "bazbaz" : "baz" }
   }
 }
 

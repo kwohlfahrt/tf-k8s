@@ -2,7 +2,6 @@ package crd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -51,14 +50,18 @@ func (c *crdResource) Metadata(ctx context.Context, req tfresource.MetadataReque
 	resp.TypeName = typeName(req.ProviderTypeName, c.typeInfo)
 }
 
+const defaultFieldManager string = "tofu-k8scrd"
+
 func (c *crdResource) Schema(ctx context.Context, req tfresource.SchemaRequest, resp *tfresource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		Version: 0,
 		Attributes: map[string]schema.Attribute{
 			"manifest": generic.OpenApiToTfSchema(ctx, c.typeInfo, false),
 			"field_manager": schema.StringAttribute{
 				Required: false,
+				Optional: true,
 				Computed: true,
-				Default:  stringdefault.StaticString(fieldManager),
+				Default:  stringdefault.StaticString(defaultFieldManager),
 			},
 		},
 	}
@@ -82,11 +85,15 @@ func (c *crdResource) Configure(ctx context.Context, req tfresource.ConfigureReq
 	c.forceConflicts = clients.forceConflicts
 }
 
-const fieldManager string = "tofu-k8scrd"
-
 func (c *crdResource) Create(ctx context.Context, req tfresource.CreateRequest, resp *tfresource.CreateResponse) {
 	var meta generic.ObjectMeta
 	resp.Diagnostics.Append(generic.StateToObjectMeta(ctx, req.Plan, c.typeInfo, &meta)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	var fieldManager string
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("field_manager"), &fieldManager)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -173,9 +180,9 @@ func (c *crdResource) Read(ctx context.Context, req tfresource.ReadRequest, resp
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	importFieldManager, diags := generic.GetImportFieldManager(ctx, req.Private, "import-field-managers")
-	resp.Diagnostics.Append(diags...)
-	if diags.HasError() {
+	var fieldManager string
+	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("field_manager"), &fieldManager)...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
@@ -187,87 +194,6 @@ func (c *crdResource) Read(ctx context.Context, req tfresource.ReadRequest, resp
 		}
 		resp.Diagnostics.AddError("Unable to fetch resource", err.Error())
 		return
-	}
-
-	readFieldManager := fieldManager
-	if importFieldManager != nil {
-		readFieldManager = *importFieldManager
-	}
-
-	fields, diags := generic.GetManagedFieldSet(obj, readFieldManager)
-	resp.Diagnostics.Append(diags...)
-	if diags.HasError() {
-		return
-	}
-	resp.Diagnostics.Append(state.ManagedFields(ctx, path.Empty(), fields, nil)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	resp.Diagnostics.Append(generic.UnstructuredToValue(ctx, c.typeInfo.Schema, *obj, fields.Leaves(), &state)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	resp.Diagnostics.Append(diags...)
-	if diags.HasError() {
-		return
-	}
-
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("manifest"), state)...)
-	if importFieldManager != nil {
-		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("field_manager"), importFieldManager)...)
-	} else {
-		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("field_manager"), fieldManager)...)
-	}
-}
-
-func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, resp *tfresource.UpdateResponse) {
-	var meta generic.ObjectMeta
-	resp.Diagnostics.Append(generic.StateToObjectMeta(ctx, req.State, c.typeInfo, &meta)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	var state types.KubernetesObjectValue
-	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("manifest"), &state)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	importFieldManager, diags := generic.GetImportFieldManager(ctx, req.Private, "import-field-managers")
-	resp.Diagnostics.Append(diags...)
-	if diags.HasError() {
-		return
-	}
-
-	obj, diags := generic.ValueToUnstructured(ctx, state, c.typeInfo)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	// TODO: Validate that the object already exists. This will silently create
-	// the object if it does not already exist.
-	obj, err := c.typeInfo.Interface(c.client, meta.Namespace).
-		Apply(ctx, meta.Name, obj, metav1.ApplyOptions{FieldManager: fieldManager, Force: c.forceConflicts})
-	if err != nil {
-		resp.Diagnostics.AddError("Unable to update resource", err.Error())
-		return
-	}
-
-	if importFieldManager != nil && *importFieldManager != fieldManager {
-		empty := unstructured.Unstructured{Object: map[string]interface{}{
-			"apiVersion": c.typeInfo.GroupVersionResource().GroupVersion().String(),
-			"kind":       c.typeInfo.Kind,
-			"metadata":   map[string]interface{}{"name": meta.Name, "namespace": meta.Namespace},
-		}}
-		_, err := c.typeInfo.Interface(c.client, meta.Namespace).
-			Apply(ctx, meta.Name, &empty, metav1.ApplyOptions{FieldManager: *importFieldManager})
-		if err != nil {
-			resp.Diagnostics.AddError("Unable to remove imported fieldManager", err.Error())
-			return
-		}
-		resp.Private.SetKey(ctx, "import-field-managers", nil)
 	}
 
 	fields, diags := generic.GetManagedFieldSet(obj, fieldManager)
@@ -284,8 +210,83 @@ func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, 
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	resp.Diagnostics.Append(diags...)
+	if diags.HasError() {
+		return
+	}
+
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("manifest"), state)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("field_manager"), fieldManager)...)
+}
+
+func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, resp *tfresource.UpdateResponse) {
+	var meta generic.ObjectMeta
+	resp.Diagnostics.Append(generic.StateToObjectMeta(ctx, req.State, c.typeInfo, &meta)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	var state types.KubernetesObjectValue
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("manifest"), &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	var fieldManager string
+	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("field_manager"), &fieldManager)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	var planFieldManager string
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("field_manager"), &planFieldManager)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	obj, diags := generic.ValueToUnstructured(ctx, state, c.typeInfo)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// TODO: Validate that the object already exists. This will silently create
+	// the object if it does not already exist.
+	obj, err := c.typeInfo.Interface(c.client, meta.Namespace).
+		Apply(ctx, meta.Name, obj, metav1.ApplyOptions{FieldManager: planFieldManager, Force: c.forceConflicts})
+	if err != nil {
+		resp.Diagnostics.AddError("Unable to update resource", err.Error())
+		return
+	}
+
+	if fieldManager != planFieldManager {
+		empty := unstructured.Unstructured{Object: map[string]interface{}{
+			"apiVersion": c.typeInfo.GroupVersionResource().GroupVersion().String(),
+			"kind":       c.typeInfo.Kind,
+			"metadata":   map[string]interface{}{"name": meta.Name, "namespace": meta.Namespace},
+		}}
+		_, err := c.typeInfo.Interface(c.client, meta.Namespace).
+			Apply(ctx, meta.Name, &empty, metav1.ApplyOptions{FieldManager: fieldManager})
+		if err != nil {
+			resp.Diagnostics.AddError("Unable to remove imported fieldManager", err.Error())
+			return
+		}
+	}
+
+	fields, diags := generic.GetManagedFieldSet(obj, defaultFieldManager)
+	resp.Diagnostics.Append(diags...)
+	if diags.HasError() {
+		return
+	}
+	resp.Diagnostics.Append(state.ManagedFields(ctx, path.Empty(), fields, nil)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	resp.Diagnostics.Append(generic.UnstructuredToValue(ctx, c.typeInfo.Schema, *obj, fields.Leaves(), &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("manifest"), state)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("field_manager"), defaultFieldManager)...)
 }
 
 func (c *crdResource) Delete(ctx context.Context, req tfresource.DeleteRequest, resp *tfresource.DeleteResponse) {
@@ -318,26 +319,27 @@ func (c *crdResource) Delete(ctx context.Context, req tfresource.DeleteRequest, 
 }
 
 func (c *crdResource) ImportState(ctx context.Context, req tfresource.ImportStateRequest, resp *tfresource.ImportStateResponse) {
+	var expectedFormat string
+	if c.typeInfo.Namespaced {
+		expectedFormat = "fieldManager:namespace/name"
+	} else {
+		expectedFormat = "fieldManager:name"
+	}
+
 	components := strings.SplitN(req.ID, ":", 2)
 	if len(components) != 2 {
-		resp.Diagnostics.AddError("Invalid import ID", fmt.Sprintf("expected fieldManagers:resource import, got %s", req.ID))
+		resp.Diagnostics.AddError("Invalid import ID", fmt.Sprintf("expected %s import, got %s", expectedFormat, req.ID))
 		return
 	}
 
-	fieldManagers := strings.Split(components[0], ",")
+	fieldManager := components[0]
 	resource := components[1]
 
-	fieldManagerState, err := json.Marshal(fieldManagers)
-	if err != nil {
-		resp.Diagnostics.AddError("Unable to marshal fieldManagers", err.Error())
-		return
-	}
-
-	metadata := make(map[string]interface{})
+	metadata := make(map[string]any)
 	if c.typeInfo.Namespaced {
 		components = strings.SplitN(resource, "/", 2)
 		if len(components) != 2 {
-			resp.Diagnostics.AddError("Invalid import ID", fmt.Sprintf("expected namespace/name resource, got %s", resource))
+			resp.Diagnostics.AddError("Invalid import ID", fmt.Sprintf("expected %s resource, got %s", expectedFormat, resource))
 			return
 		}
 		metadata["namespace"] = components[0]
@@ -346,7 +348,7 @@ func (c *crdResource) ImportState(ctx context.Context, req tfresource.ImportStat
 		metadata["name"] = resource
 	}
 
-	obj := unstructured.Unstructured{Object: map[string]interface{}{"metadata": metadata}}
+	obj := unstructured.Unstructured{Object: map[string]any{"metadata": metadata}}
 	var state types.KubernetesObjectValue
 	resp.Diagnostics.Append(generic.UnstructuredToValue(ctx, c.typeInfo.Schema, obj, nil, &state)...)
 	if resp.Diagnostics.HasError() {
@@ -354,7 +356,7 @@ func (c *crdResource) ImportState(ctx context.Context, req tfresource.ImportStat
 	}
 
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("manifest"), state)...)
-	resp.Private.SetKey(ctx, "import-field-managers", fieldManagerState)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("field_manager"), fieldManager)...)
 }
 
 func (c *crdResource) MoveState(ctx context.Context) []tfresource.StateMover {
@@ -366,7 +368,8 @@ func (c *crdResource) MoveState(ctx context.Context) []tfresource.StateMover {
 				"field_manager": schema.StringAttribute{
 					Required: false,
 					Computed: true,
-					Default:  stringdefault.StaticString(fieldManager),
+					Optional: true,
+					Default:  stringdefault.StaticString(defaultFieldManager),
 				},
 			},
 		},
