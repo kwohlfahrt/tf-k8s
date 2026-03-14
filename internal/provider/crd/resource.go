@@ -211,11 +211,6 @@ func (c *crdResource) Read(ctx context.Context, req tfresource.ReadRequest, resp
 		return
 	}
 
-	resp.Diagnostics.Append(diags...)
-	if diags.HasError() {
-		return
-	}
-
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("manifest"), state)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("field_manager"), fieldManager)...)
 }
