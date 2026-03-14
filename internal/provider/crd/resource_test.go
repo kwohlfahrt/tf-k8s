@@ -129,6 +129,12 @@ func patchState(wd string) error {
 		if typ, isK8s := strings.CutPrefix(typ, "k8s_"); isK8s {
 			resource["type"] = "k8scrd_" + typ
 		}
+		instances := resource["instances"].([]any)
+		for _, instance := range instances {
+			instance := instance.(map[string]any)
+			attributes := instance["attributes"].(map[string]any)
+			delete(attributes, "force_conflicts")
+		}
 	}
 
 	rawState, err = json.Marshal(state)

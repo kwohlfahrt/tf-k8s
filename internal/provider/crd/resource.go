@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	tfresource "github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/kwohlfahrt/tf-k8s/internal/generic"
 	"github.com/kwohlfahrt/tf-k8s/internal/types"
@@ -23,9 +24,8 @@ import (
 )
 
 type crdResource struct {
-	typeInfo       generic.TypeInfo
-	client         *dynamic.DynamicClient
-	forceConflicts bool
+	typeInfo generic.TypeInfo
+	client   *dynamic.DynamicClient
 }
 
 func NewResource(typeInfo generic.TypeInfo) tfresource.Resource {
@@ -63,6 +63,12 @@ func (c *crdResource) Schema(ctx context.Context, req tfresource.SchemaRequest, 
 				Computed: true,
 				Default:  stringdefault.StaticString(defaultFieldManager),
 			},
+			"force_conflicts": schema.BoolAttribute{
+				Required: false,
+				Optional: true,
+				Computed: true,
+				Default:  booldefault.StaticBool(false),
+			},
 		},
 	}
 }
@@ -82,7 +88,6 @@ func (c *crdResource) Configure(ctx context.Context, req tfresource.ConfigureReq
 		return
 	}
 	c.client = clients.dynamic
-	c.forceConflicts = clients.forceConflicts
 }
 
 func (c *crdResource) Create(ctx context.Context, req tfresource.CreateRequest, resp *tfresource.CreateResponse) {
@@ -91,9 +96,13 @@ func (c *crdResource) Create(ctx context.Context, req tfresource.CreateRequest, 
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 	var fieldManager string
 	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("field_manager"), &fieldManager)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	var forceConflicts *bool
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("force_conflicts"), &forceConflicts)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -167,6 +176,7 @@ func (c *crdResource) Create(ctx context.Context, req tfresource.CreateRequest, 
 
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("manifest"), state)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("field_manager"), fieldManager)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("force_conflicts"), forceConflicts)...)
 }
 
 func (c *crdResource) Read(ctx context.Context, req tfresource.ReadRequest, resp *tfresource.ReadResponse) {
@@ -182,6 +192,11 @@ func (c *crdResource) Read(ctx context.Context, req tfresource.ReadRequest, resp
 	}
 	var fieldManager string
 	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("field_manager"), &fieldManager)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	var forceConflicts *bool
+	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("force_conflicts"), &forceConflicts)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -213,6 +228,7 @@ func (c *crdResource) Read(ctx context.Context, req tfresource.ReadRequest, resp
 
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("manifest"), state)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("field_manager"), fieldManager)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("force_conflicts"), forceConflicts)...)
 }
 
 func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, resp *tfresource.UpdateResponse) {
@@ -231,6 +247,11 @@ func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, 
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	var forceConflicts *bool
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("force_conflicts"), &forceConflicts)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	if fieldManager != planFieldManager {
 		var oldState types.KubernetesObjectValue
@@ -245,7 +266,7 @@ func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, 
 		}
 
 		_, err := c.typeInfo.Interface(c.client, meta.Namespace).
-			Apply(ctx, meta.Name, obj, metav1.ApplyOptions{FieldManager: planFieldManager})
+			Apply(ctx, meta.Name, obj, metav1.ApplyOptions{FieldManager: planFieldManager, Force: *forceConflicts})
 		if err != nil {
 			resp.Diagnostics.AddError("Unable to apply new fieldManager", err.Error())
 			return
@@ -278,7 +299,7 @@ func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, 
 	// TODO: Validate that the object already exists. This will silently create
 	// the object if it does not already exist.
 	obj, err := c.typeInfo.Interface(c.client, meta.Namespace).
-		Apply(ctx, meta.Name, obj, metav1.ApplyOptions{FieldManager: planFieldManager, Force: c.forceConflicts})
+		Apply(ctx, meta.Name, obj, metav1.ApplyOptions{FieldManager: planFieldManager, Force: *forceConflicts})
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to update resource", err.Error())
 		return
@@ -300,6 +321,7 @@ func (c *crdResource) Update(ctx context.Context, req tfresource.UpdateRequest, 
 	}
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("manifest"), state)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("field_manager"), planFieldManager)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("force_conflicts"), forceConflicts)...)
 }
 
 func (c *crdResource) Delete(ctx context.Context, req tfresource.DeleteRequest, resp *tfresource.DeleteResponse) {
@@ -383,6 +405,12 @@ func (c *crdResource) MoveState(ctx context.Context) []tfresource.StateMover {
 					Computed: true,
 					Optional: true,
 					Default:  stringdefault.StaticString(defaultFieldManager),
+				},
+				"force_conflicts": schema.BoolAttribute{
+					Required: false,
+					Computed: true,
+					Optional: true,
+					Default:  booldefault.StaticBool(false),
 				},
 			},
 		},

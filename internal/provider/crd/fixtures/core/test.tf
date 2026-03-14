@@ -134,7 +134,11 @@ resource "k8s_clusterrolebinding_rbac_authorization_k8s_io_v1" "baz" {
       kind      = "ClusterRole"
       name      = "system:node"
     }
+    subjects = []
   }
+  # Required due to migration not working for some empty fields. See
+  # kubernetes/kubernetes#128924.
+  force_conflicts = true
 }
 
 import {
