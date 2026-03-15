@@ -51,6 +51,8 @@ resource "k8s_deployment_apps_v1" "bar" {
             { name = "foo", image = "busybox" },
             { name = "ubuntu", image = "ubuntu:22.04", liveness_probe = { http_get = { port = "healthz" } } },
           ]
+          # k8s doesn't include an empty volumes field in `managedFields`. Test
+          # that we handle this properly.
           volumes = []
         }
       }
@@ -134,7 +136,11 @@ resource "k8s_clusterrolebinding_rbac_authorization_k8s_io_v1" "baz" {
       kind      = "ClusterRole"
       name      = "system:node"
     }
+    subjects = []
   }
+  # Required due to migration not working for some empty fields. See
+  # kubernetes/kubernetes#128924.
+  force_conflicts = true
 }
 
 import {
