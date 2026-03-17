@@ -50,7 +50,7 @@ func (c *crdResource) Metadata(ctx context.Context, req tfresource.MetadataReque
 	resp.TypeName = typeName(req.ProviderTypeName, c.typeInfo)
 }
 
-const defaultFieldManager string = "tofu-k8scrd"
+const defaultFieldManager string = "tofu-k8s"
 
 func (c *crdResource) Schema(ctx context.Context, req tfresource.SchemaRequest, resp *tfresource.SchemaResponse) {
 	resp.Schema = schema.Schema{
