@@ -24,7 +24,7 @@ jobs:
         if: startswith(github.event.ref, 'refs/tags/')
         run: |
           echo "${{ github.ref_name }}" \
-            | sed -nr 's/^resource-([a-z]+)-v([0-9].*)$/keys=["\1"]\nversion=\2/p; t; q1' >> $GITHUB_OUTPUT
+            | sed -nr 's/^resource-([a-z-]+)-v([0-9].*)$/keys=["\1"]\nversion=\2/p; t; q1' >> $GITHUB_OUTPUT
           echo 'os=["darwin", "linux", "windows"]' >> $GITHUB_OUTPUT
           echo 'arch=["amd64", "arm64", "riscv64"]' >> $GITHUB_OUTPUT
       - id: list-providers
